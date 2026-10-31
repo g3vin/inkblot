@@ -6,8 +6,7 @@
  * correctly from the rects alone — including the case that would hang a naive
  * implementation (two groups that each contain the other).
  */
-const C = '../../src'
-const { historyReducer, createHistory } = await import(`${C}/canvas/canvasReducer.ts`)
+const { historyReducer, createHistory } = await import('../../src/canvas/canvasReducer.ts')
 const {
   createEmptyCanvas,
   makeTextNode,
@@ -17,7 +16,7 @@ const {
   expandGroupSelection,
   groupsToRefit,
   DEFAULT_GROUP_PADDING,
-} = await import(`${C}/lib/canvasModel.js`)
+} = await import('../../src/lib/canvasModel.js')
 import { ok } from './assert.mjs'
 
 let h = createHistory(createEmptyCanvas())

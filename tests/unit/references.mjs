@@ -12,15 +12,14 @@ const dom = new JSDOM('<!doctype html><html><body></body></html>')
 installGlobals(dom.window, ['document', 'navigator', 'DOMParser', 'Node', 'Element', 'HTMLElement', 'CustomEvent'])
 Object.defineProperty(globalThis, 'window', { value: dom.window, writable: true, configurable: true })
 
-const R = '../../src/lib/references'
-const { identify, isbnIsValid } = await import(`${R}/identify.js`)
-const { extractFromHtml } = await import(`${R}/metadata.js`)
-const { toCsl, fromCsl, normalizeDate, parseName } = await import(`${R}/csl.js`)
-const { loadStyle, CITATION_STYLES } = await import(`${R}/styles.js`)
-const { formatDocument, formatLibrary, tidy } = await import(`${R}/format.js`)
-const { resolveInput } = await import(`${R}/resolve.js`)
-const { REFERENCE_KINDS, missingFields } = await import(`${R}/referenceKinds.js`)
-const store = await import(`${R}/referenceStore.js`)
+const { identify, isbnIsValid } = await import('../../src/lib/references/identify.js')
+const { extractFromHtml } = await import('../../src/lib/references/metadata.js')
+const { toCsl, fromCsl, normalizeDate, parseName } = await import('../../src/lib/references/csl.js')
+const { loadStyle, CITATION_STYLES } = await import('../../src/lib/references/styles.js')
+const { formatDocument, formatLibrary, tidy } = await import('../../src/lib/references/format.js')
+const { resolveInput } = await import('../../src/lib/references/resolve.js')
+const { REFERENCE_KINDS, missingFields } = await import('../../src/lib/references/referenceKinds.js')
+const store = await import('../../src/lib/references/referenceStore.js')
 const { saveDocument, renameEntry, duplicateEntry, deleteEntry } = await import('../../src/lib/FileSystem.js')
 
 const ok = (l, c, detail) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) { process.exitCode = 1; if (detail !== undefined) console.log('      got:', detail) } }

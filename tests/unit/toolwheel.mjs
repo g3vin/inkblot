@@ -29,19 +29,18 @@ for (const proto of [dom.window.Element.prototype, dom.window.Range.prototype, d
 }
 window.PointerEvent ??= class extends window.MouseEvent {}
 
-const S = '../../src'
-const G = await import(`${S}/ui/inkWheelGeometry.js`)
+const G = await import('../../src/ui/inkWheelGeometry.js')
 const { StrictMode, createElement } = await import('react')
 const { createRoot } = await import('react-dom/client')
 const { act } = await import('react')
-const { default: ToolWheel } = await import(`${S}/ui/ToolWheel.jsx`)
+const { default: ToolWheel } = await import('../../src/ui/ToolWheel.jsx')
 const { Editor } = await import('@tiptap/core')
 const { StarterKit } = await import('@tiptap/starter-kit')
 const { Highlight } = await import('@tiptap/extension-highlight')
-const { HiddenText, HIDDEN_TEXT_KEY } = await import(`${S}/extensions/HiddenText.js`)
-const { wheelItems, runSelectionTool } = await import(`${S}/lib/selectionTools.js`)
-const { withoutHiddenText } = await import(`${S}/print/hiddenText.ts`)
-const { normalizeSelectionWheel, DEFAULT_SELECTION_WHEEL } = await import(`${S}/components/selectionWheelSettings.js`)
+const { HiddenText, HIDDEN_TEXT_KEY } = await import('../../src/extensions/HiddenText.js')
+const { wheelItems, runSelectionTool } = await import('../../src/lib/selectionTools.js')
+const { withoutHiddenText } = await import('../../src/print/hiddenText.ts')
+const { normalizeSelectionWheel, DEFAULT_SELECTION_WHEEL } = await import('../../src/components/selectionWheelSettings.js')
 
 /* ---------------- the ring ---------------- */
 
@@ -234,7 +233,7 @@ const pills = (editor) => editor.view.dom.querySelectorAll('.hidden-text-pill[da
 }
 
 {
-  const { getReadableEditorPayload } = await import(`${S}/lib/readAloud.js`)
+  const { getReadableEditorPayload } = await import('../../src/lib/readAloud.js')
   const editor = makeEditor('<p>Keep this hide this keep</p>')
   editor.commands.setTextSelection({ from: 11, to: 20 })
   editor.commands.setHiddenText()
@@ -246,7 +245,7 @@ const pills = (editor) => editor.view.dom.querySelectorAll('.hidden-text-pill[da
 
 {
   // Closing the wheel gives the page its focus back, so holding the key again reopens it.
-  const { default: SelectionWheel } = await import(`${S}/components/SelectionWheel.jsx`)
+  const { default: SelectionWheel } = await import('../../src/components/SelectionWheel.jsx')
   const editor = makeEditor('<p>One two three</p>')
   // jsdom focuses a contenteditable only with a tabindex; a browser needs none.
   editor.view.dom.tabIndex = 0

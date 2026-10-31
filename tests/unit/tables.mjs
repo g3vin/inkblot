@@ -23,12 +23,11 @@ for (const proto of [dom.window.Element.prototype, dom.window.Range.prototype, d
   proto.getBoundingClientRect ??= noRect
 }
 
-const S = '../../src'
 const { Editor } = await import('@tiptap/core')
 const { StarterKit } = await import('@tiptap/starter-kit')
 const { TextAlign } = await import('@tiptap/extension-text-align')
 const { TableRow } = await import('@tiptap/extension-table-row')
-const { StyledTable, StyledTableCell, StyledTableHeader } = await import(`${S}/extensions/TableStyles.js`)
+const { StyledTable, StyledTableCell, StyledTableHeader } = await import('../../src/extensions/TableStyles.js')
 
 const makeEditor = (content = '<p>Before</p>') => new Editor({
   element: document.getElementById('root').appendChild(document.createElement('div')),
@@ -82,19 +81,19 @@ stray.destroy()
 
 /* ---------------- in the exports ---------------- */
 
-const { fillHex, tableEdges, TABLE_STYLES_CSS } = await import(`${S}/print/export/tableStyles.ts`)
+const { fillHex, tableEdges, TABLE_STYLES_CSS } = await import('../../src/print/export/tableStyles.ts')
 ok('a fill is a pale wash of its paper ink', /^[0-9A-F]{6}$/.test(fillHex('teal')) && parseInt(fillHex('teal').slice(0, 2), 16) > 200)
 ok('no fill for something else', fillHex('#123456') === null && fillHex(null) === null)
 ok('edges by style', tableEdges('inner').inner && !tableEdges('inner').outer && !tableEdges('none').outer && tableEdges(undefined).outer)
 ok('the stylesheet draws fills and borders', TABLE_STYLES_CSS.includes(`td[data-fill="teal"] { background: #${fillHex('teal')}; }`) && TABLE_STYLES_CSS.includes('table[data-borders="none"]'))
 
-const { chapterBodyHtml, PROSE_CSS } = await import(`${S}/print/export/html.ts`)
+const { chapterBodyHtml, PROSE_CSS } = await import('../../src/print/export/html.ts')
 const body = chapterBodyHtml(editor.getJSON())
 ok('an exported chapter keeps the fill and the borders', body.includes('data-fill="teal"') && body.includes('data-borders="none"'))
 ok('and the export stylesheet has the rules', PROSE_CSS.includes(TABLE_STYLES_CSS))
 
-const { buildDocx } = await import(`${S}/print/export/docx.ts`)
-const { listZip } = await import(`${S}/print/export/zip.ts`)
+const { buildDocx } = await import('../../src/print/export/docx.ts')
+const { listZip } = await import('../../src/print/export/zip.ts')
 const { inflateRawSync } = await import('node:zlib')
 const readZipEntry = (bytes, name) => {
   const e = listZip(bytes).find((entry) => entry.name === name)
@@ -116,8 +115,8 @@ ok('and draws no borders on a table without them', wordDoc.includes('<w:insideH 
 const React = (await import('react')).default
 const { act } = await import('react')
 const { createRoot } = await import('react-dom/client')
-const { default: TableToolbar } = await import(`${S}/components/TableToolbar.jsx`)
-const { listCommands } = await import(`${S}/lib/commands.ts`)
+const { default: TableToolbar } = await import('../../src/components/TableToolbar.jsx')
+const { listCommands } = await import('../../src/lib/commands.ts')
 
 const host = document.getElementById('root').appendChild(document.createElement('div'))
 const root = createRoot(host)

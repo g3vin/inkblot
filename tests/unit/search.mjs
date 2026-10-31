@@ -5,11 +5,10 @@
  * ProseMirror document matches NOTHING, with no error anywhere. So the first thing
  * asserted is simply that a canvas yields hits.
  */
-const C = '../../src'
-const { collectCanvasMatches } = await import(`${C}/lib/canvasSearch.js`)
+const { collectCanvasMatches } = await import('../../src/lib/canvasSearch.js')
 const { serializeCanvas, createEmptyCanvas, makeTextNode, makeGroupNode, makeFileNode, makeEdge } =
-  await import(`${C}/lib/canvasModel.js`)
-const { createMatcher, searchEverything } = await import(`${C}/lib/sidebarSearch.js`)
+  await import('../../src/lib/canvasModel.js')
+const { createMatcher, searchEverything } = await import('../../src/lib/sidebarSearch.js')
 
 // collectCanvasMatches takes a COMPILED matcher, not a query string — the same one
 // sidebarSearch builds, so every search honours the same case/whole-word/regex

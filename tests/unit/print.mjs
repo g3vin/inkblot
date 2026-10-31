@@ -13,15 +13,14 @@ const dom = new JSDOM('<!doctype html><html><body></body></html>')
 installGlobals(dom.window, ['document', 'navigator', 'DOMParser', 'Node', 'Element', 'HTMLElement'])
 Object.defineProperty(globalThis, 'window', { value: dom.window, writable: true, configurable: true })
 
-const C = '../../src'
-const sizes = await import(`${C}/print/pageSizes.ts`)
-const setupMod = await import(`${C}/print/pageSetup.ts`)
-const { paginate } = await import(`${C}/print/paginate.ts`)
-const imp = await import(`${C}/print/imposition.ts`)
+const sizes = await import('../../src/print/pageSizes.ts')
+const setupMod = await import('../../src/print/pageSetup.ts')
+const { paginate } = await import('../../src/print/paginate.ts')
+const imp = await import('../../src/print/imposition.ts')
 const { Editor, generateHTML } = await import('@tiptap/core')
-const { buildEditorExtensions, getDocPreviewExtensions } = await import(`${C}/lib/editorExtensions.js`)
+const { buildEditorExtensions, getDocPreviewExtensions } = await import('../../src/lib/editorExtensions.js')
 const { StarterKit } = await import('@tiptap/starter-kit')
-const docPageSetup = await import(`${C}/print/DocPageSetup.js`)
+const docPageSetup = await import('../../src/print/DocPageSetup.js')
 
 const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps
@@ -251,11 +250,11 @@ reloaded.destroy()
 /* ---- exports ---- */
 
 installGlobals(dom.window, ['XMLSerializer'])
-const { toMarkdown } = await import(`${C}/print/export/markdown.ts`)
-const { portableContent } = await import(`${C}/print/export/portable.ts`)
-const { createZip, listZip } = await import(`${C}/print/export/zip.ts`)
-const { buildEpub, toXhtmlBody } = await import(`${C}/print/export/epub.ts`)
-const { buildHtmlDocument } = await import(`${C}/print/export/html.ts`)
+const { toMarkdown } = await import('../../src/print/export/markdown.ts')
+const { portableContent } = await import('../../src/print/export/portable.ts')
+const { createZip, listZip } = await import('../../src/print/export/zip.ts')
+const { buildEpub, toXhtmlBody } = await import('../../src/print/export/epub.ts')
+const { buildHtmlDocument } = await import('../../src/print/export/html.ts')
 
 const t = (text, marks) => ({ type: 'text', text, ...(marks ? { marks } : {}) })
 const p = (...content) => ({ type: 'paragraph', content })

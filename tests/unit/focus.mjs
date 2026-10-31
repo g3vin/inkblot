@@ -26,14 +26,13 @@ for (const proto of [dom.window.Element.prototype, dom.window.Range.prototype, d
   proto.getBoundingClientRect ??= noRect
 }
 
-const S = '../../src'
-const F = await import(`${S}/lib/focusText.js`)
+const F = await import('../../src/lib/focusText.js')
 const { Editor } = await import('@tiptap/core')
 const { StarterKit } = await import('@tiptap/starter-kit')
 const { TextSelection } = await import('@tiptap/pm/state')
 const React = await import('react')
 const { createRoot } = await import('react-dom/client')
-const { default: FocusModeOverlay } = await import(`${S}/components/FocusModeOverlay.jsx`)
+const { default: FocusModeOverlay } = await import('../../src/components/FocusModeOverlay.jsx')
 
 const makeEditor = (html) => new Editor({
   element: document.getElementById('root').appendChild(document.createElement('div')),

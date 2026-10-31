@@ -11,9 +11,8 @@
  *   2. A note card references its note; it never copies it. If a canvas ever stored
  *      note content of its own, the two would fork and "two-way sync" would be a lie.
  */
-const C = '../../src'
-const { saveDocument, loadDocument, saveDocumentNotes } = await import(`${C}/lib/FileSystem.js`)
-const { makeNoteNode, serializeCanvas, createEmptyCanvas } = await import(`${C}/lib/canvasModel.js`)
+const { saveDocument, loadDocument, saveDocumentNotes } = await import('../../src/lib/FileSystem.js')
+const { makeNoteNode, serializeCanvas, createEmptyCanvas } = await import('../../src/lib/canvasModel.js')
 import { ok } from './assert.mjs'
 
 const P = 'proj'

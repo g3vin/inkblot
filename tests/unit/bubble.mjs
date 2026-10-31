@@ -28,22 +28,21 @@ for (const proto of [dom.window.Element.prototype, dom.window.Range.prototype, d
   proto.getBoundingClientRect ??= noRect
 }
 
-const S = '../../src'
-const text = await import(`${S}/lib/bubbleText.ts`)
-const forms = await import(`${S}/lib/bubbleForms.ts`)
-const drop = await import(`${S}/lib/bubbleDrop.js`)
+const text = await import('../../src/lib/bubbleText.ts')
+const forms = await import('../../src/lib/bubbleForms.ts')
+const drop = await import('../../src/lib/bubbleDrop.js')
 const { Editor } = await import('@tiptap/core')
 const { StarterKit } = await import('@tiptap/starter-kit')
 const { Slice } = await import('@tiptap/pm/model')
 const { TextSelection } = await import('@tiptap/pm/state')
 const { BubbleSession, findBubbleSession, bubbleSessionAt, findBubbleSessions, showSessionForm, sessionForms } =
-  await import(`${S}/extensions/BubbleSession.js`)
+  await import('../../src/extensions/BubbleSession.js')
 const { writeBubbleSession, selectionForBubble, useBubbleSessions } =
-  await import(`${S}/hooks/useBubbleSessions.js`)
+  await import('../../src/hooks/useBubbleSessions.js')
 const { files } = await import('./stub-fs.mjs')
-const { getProjectRoot } = await import(`${S}/lib/projectPaths.ts`)
-const archiveStore = await import(`${S}/lib/archiveStore.js`)
-const { saveDocument } = await import(`${S}/lib/FileSystem.js`)
+const { getProjectRoot } = await import('../../src/lib/projectPaths.ts')
+const archiveStore = await import('../../src/lib/archiveStore.js')
+const { saveDocument } = await import('../../src/lib/FileSystem.js')
 
 const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
 const texts = (words) => words.map((word) => word.text)
@@ -338,7 +337,7 @@ ok('and with no space after it now, its chip has none to stand in for',
 
 // A note's dot hangs the same way.
 {
-  const { NoteAnnotation, syncEditorNotes } = await import(`${S}/extensions/NoteAnnotation.js`)
+  const { NoteAnnotation, syncEditorNotes } = await import('../../src/extensions/NoteAnnotation.js')
   const noted = new Editor({
     element: document.getElementById('root').appendChild(document.createElement('div')),
     extensions: [StarterKit, NoteAnnotation],
@@ -498,7 +497,7 @@ await saveDocument('Archive Project', 'one.md', { content: { type: 'doc' }, note
 ok('an autosave carries the archive forward', JSON.parse(files.get(docFile)).archive?.length === 1)
 
 // Restoring puts it back on its sentence, where the sentence still is.
-const { restoreArchivedItem } = await import(`${S}/lib/archiveRestore.js`)
+const { restoreArchivedItem } = await import('../../src/lib/archiveRestore.js')
 ok('restoring puts the session back on its sentence', restoreArchivedItem(doc, archive[0])
   && findBubbleSession(doc.state.doc, opened.id)?.session.aside[0].text === 'three'
   && doc.state.doc.textBetween(findBubbleSession(doc.state.doc, opened.id).from, findBubbleSession(doc.state.doc, opened.id).to) === 'Four two.')
@@ -543,7 +542,7 @@ for (const instance of [editor, restored, bold, doc, lone, para]) instance.destr
 
 /* ---------------- the page's editor, mounted ---------------- */
 
-const BubbleEditor = (await import(`${S}/components/bubble/BubbleEditor.jsx`)).default
+const BubbleEditor = (await import('../../src/components/bubble/BubbleEditor.jsx')).default
 const editorRoot = createRoot(document.getElementById('root').appendChild(document.createElement('div')))
 let closed = null
 const start = text.createSession('She hesitated at the door, then she left.')

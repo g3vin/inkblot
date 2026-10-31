@@ -19,10 +19,9 @@ const dom = new JSDOM('<!doctype html><html><body></body></html>')
 installGlobals(dom.window, ['document', 'navigator', 'DOMParser', 'Node', 'Element', 'HTMLElement'])
 Object.defineProperty(globalThis, 'window', { value: dom.window, writable: true, configurable: true })
 
-const C = '../../src'
 const { generateHTML } = await import('@tiptap/core')
 const { getCardExtensions, getCardSchema, getDocPreviewExtensions } =
-  await import(`${C}/lib/editorExtensions.js`)
+  await import('../../src/lib/editorExtensions.js')
 import { ok } from './assert.mjs'
 
 const render = (content) => generateHTML(content, getCardExtensions())

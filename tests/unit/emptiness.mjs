@@ -9,12 +9,11 @@
 import { files } from './stub-fs.mjs'
 import { ok } from './assert.mjs'
 
-const S = '../../src'
-const { saveDocument, writeDocumentRaw, createFolder } = await import(`${S}/lib/FileSystem.js`)
-const { getProjectRoot, joinPath } = await import(`${S}/lib/projectPaths.ts`)
-const { isEntryEmpty, isRichTextEmpty } = await import(`${S}/lib/emptiness.js`)
-const { isNoteEmpty } = await import(`${S}/lib/noteUtils.js`)
-const { createDocumentOfKind } = await import(`${S}/lib/createDocument.js`)
+const { saveDocument, writeDocumentRaw, createFolder } = await import('../../src/lib/FileSystem.js')
+const { getProjectRoot, joinPath } = await import('../../src/lib/projectPaths.ts')
+const { isEntryEmpty, isRichTextEmpty } = await import('../../src/lib/emptiness.js')
+const { isNoteEmpty } = await import('../../src/lib/noteUtils.js')
+const { createDocumentOfKind } = await import('../../src/lib/createDocument.js')
 
 const P = 'emptyproj'
 const para = (text) => ({ type: 'paragraph', content: text ? [{ type: 'text', text }] : undefined })
