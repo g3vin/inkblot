@@ -57,7 +57,7 @@
     "citeproc": "^2.4.63",
     "compromise": "^14.19.0",
     "d3-geo": "^3.1.1",
-    "framer-motion": "^12.43.0",
+    "framer-motion": "^14.9.0",
     "lodash": "^4.18.1",
     "maplibre-gl": "6.15.0",
     "phonemize": "^2.0.1",
