@@ -24,7 +24,6 @@ use std::sync::Arc;
 
 use inkblot_core::kokoro;
 use ndarray::Array;
-use ort::session::builder::SessionBuilder;
 use ort::session::Session;
 use ort::value::Tensor;
 use parking_lot::Mutex;
@@ -206,8 +205,7 @@ impl KokoroEngine {
         let mut guard = self.session.lock();
         if guard.is_none() {
             *guard = Some(
-                SessionBuilder::new()
-                    .map_err(|e| format!("onnx session builder: {e}"))?
+                crate::onnx_session_builder()?
                     .commit_from_file(&model_path)
                     .map_err(|e| format!("loading {model_path:?}: {e}"))?,
             );

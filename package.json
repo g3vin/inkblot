@@ -57,13 +57,13 @@
     "citeproc": "^2.4.63",
     "compromise": "^14.19.0",
     "d3-geo": "^3.1.1",
-    "framer-motion": "^12.43.0",
+    "framer-motion": "^14.9.0",
     "lodash": "^4.18.1",
-    "maplibre-gl": "6.11.2",
+    "maplibre-gl": "6.15.0",
     "phonemize": "^2.0.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "three": "0.185.1",
+    "three": "0.186.1",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2"
   },
@@ -85,6 +85,7 @@
     "vite": "^8.3.5"
   },
   "overrides": {
-    "@tauri-apps/api": "2.12.4"
+    "@tauri-apps/api": "2.12.4",
+    "sharp": "^0.35.5"
   }
 }
