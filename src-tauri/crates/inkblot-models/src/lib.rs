@@ -17,6 +17,10 @@
 //! 3. A `src-tauri/src/<name>_commands.rs` wrapper: a `*State` holding the engine in a
 //!    `OnceLock`, registered with `.manage` and `generate_handler!` in `lib.rs`.
 
+use ort::environment::Environment;
+use ort::session::builder::SessionBuilder;
+use parking_lot::Mutex;
+
 mod download;
 
 #[cfg(feature = "dictation")]
@@ -29,3 +33,20 @@ pub mod synonyms;
 /// The sentinel the webview matches on to offer a model download. Prose here would be
 /// shown to the user as an error instead.
 pub const MODEL_NOT_INSTALLED: &str = "MODEL_NOT_INSTALLED";
+
+/// A session builder under the process's one ONNX Runtime environment. `ort` holds the
+/// environment only weakly, so it is kept here for the life of the process, and behind
+/// a lock so two engines loading at once cannot each build one.
+fn onnx_session_builder() -> Result<SessionBuilder, String> {
+    static ENVIRONMENT: Mutex<Option<Environment>> = Mutex::new(None);
+    let mut environment = ENVIRONMENT.lock();
+    if environment.is_none() {
+        *environment = Some(
+            ort::init()
+                .build()
+                .map_err(|e| format!("onnx environment: {e}"))?,
+        );
+    }
+    let environment = environment.as_ref().expect("environment just built");
+    SessionBuilder::new(environment).map_err(|e| format!("onnx session builder: {e}"))
+}
