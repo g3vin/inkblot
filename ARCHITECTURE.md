@@ -350,7 +350,7 @@ The mirrored modules (each JS file names its twin on a `Mirrors:` line, which
 | `canvasGeometry.js` | `canvas_geometry.rs` |
 | `canvasModel.js` | `canvas_model.rs` |
 | `storyStructure.js` | `story_structure.rs` |
-| `versionHistory.js` | `version_history.rs` |
+| `versionHistory.js` | `version_history/` (`mod.rs`, `text_diff.rs`, `canvas_diff.rs`) |
 | `versionStore.js` | `store/versions.rs` |
 | `projectPaths.ts` | `store/paths.rs` |
 | `FileSystem.js`, `projectLocations.js` | `store/mod.rs`, `store/locations.rs` |
