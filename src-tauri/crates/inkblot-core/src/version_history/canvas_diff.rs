@@ -86,7 +86,7 @@ pub fn diff_canvases(left: &CanvasFile, right: &CanvasFile) -> CanvasDiff {
                 diff.edited.push(CanvasNodeChange {
                     before: (*before).clone(),
                     after: node.clone(),
-                })
+                });
             }
             Some(before) if node_moved(before, node) => diff.moved.push(CanvasNodeChange {
                 before: (*before).clone(),

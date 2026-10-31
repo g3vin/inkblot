@@ -142,7 +142,9 @@ mod macos {
     /// Record the placement, watch the window if it isn't yet, and apply it now.
     pub fn place(label: &str, ns_window: usize, placement: Placement) {
         let watch = {
-            let mut guard = PLACEMENTS.lock().unwrap_or_else(|e| e.into_inner());
+            let mut guard = PLACEMENTS
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             let map = guard.get_or_insert_with(HashMap::new);
             let watched = map.get(label).map(|(_, watched)| *watched).unwrap_or(false);
             map.insert(label.to_string(), (placement, true));
@@ -190,7 +192,7 @@ mod macos {
             // buttons and clipping them at the window's top. Any move of the container or
             // a button puts them back.
             let block = RcBlock::new(move |note: NonNull<AnyObject>| {
-                if APPLYING.with(|applying| applying.get()) {
+                if APPLYING.with(std::cell::Cell::get) {
                     return;
                 }
                 let view: *mut AnyObject = msg_send![note.as_ptr(), object];

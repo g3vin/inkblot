@@ -295,7 +295,10 @@ fn dispatch(name: &str, args: &[Value]) -> Result<Value, String> {
                 _ => None,
             };
             let name = text()?;
-            json!(kind.map_or(name.clone(), |kind| doc_kind::with_doc_suffix(&name, kind)))
+            json!(match kind {
+                Some(kind) => doc_kind::with_doc_suffix(&name, kind),
+                None => name,
+            })
         }
 
         /* ---- canvas_geometry ---- */

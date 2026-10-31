@@ -100,7 +100,7 @@ impl PreferenceStore {
         let mut scopes = self
             .scopes
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some(map) = scopes.get(&scope) {
             return map.clone();
         }
@@ -119,7 +119,7 @@ impl PreferenceStore {
             let mut scopes = self
                 .scopes
                 .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             scopes.insert(scope, map.clone());
         }
         std::fs::create_dir_all(&self.app_data_root)?;

@@ -80,7 +80,7 @@ pub(crate) fn best_url_from_srcset(srcset: &str) -> Option<String> {
 }
 
 pub(crate) fn extract_attr(tag: &str, attr: &str) -> Option<String> {
-    let needle = format!("{}=\"", attr);
+    let needle = format!("{attr}=\"");
     let start = tag.find(&needle)? + needle.len();
     let rest = &tag[start..];
     let end = rest.find('"')?;
@@ -156,23 +156,23 @@ pub async fn scrape_pinterest_html(
         let mut pin_href = url.clone();
         if let Some(pin_pos) = around.find("/pin/") {
             let tail = &around[pin_pos + 5..];
-            let digits: String = tail.chars().take_while(|c| c.is_ascii_digit()).collect();
+            let digits: String = tail.chars().take_while(char::is_ascii_digit).collect();
             if !digits.is_empty() {
-                pin_href = format!("https://www.pinterest.com/pin/{}/", digits);
+                pin_href = format!("https://www.pinterest.com/pin/{digits}/");
             }
         }
 
         if pin_href == url {
             if let Some(pin_id_attr) = around.find("data-pin-id=\"") {
                 let after = &around[pin_id_attr + 13..];
-                let digits: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
+                let digits: String = after.chars().take_while(char::is_ascii_digit).collect();
                 if !digits.is_empty() {
-                    pin_href = format!("https://www.pinterest.com/pin/{}/", digits);
+                    pin_href = format!("https://www.pinterest.com/pin/{digits}/");
                 }
             }
         }
 
-        let key = format!("{}::{}", pin_href, image_url);
+        let key = format!("{pin_href}::{image_url}");
         if seen.contains(&key) {
             continue;
         }
@@ -213,7 +213,7 @@ pub async fn scrape_pinterest_html(
                         // Extract pin id (digits).
                         let digits: String = decoded[after_pin..]
                             .chars()
-                            .take_while(|c| c.is_ascii_digit())
+                            .take_while(char::is_ascii_digit)
                             .collect();
                         search_pos = after_pin + digits.len();
 
@@ -221,7 +221,7 @@ pub async fn scrape_pinterest_html(
                             continue;
                         }
 
-                        let pin_href = format!("https://www.pinterest.com/pin/{}/", digits);
+                        let pin_href = format!("https://www.pinterest.com/pin/{digits}/");
 
                         // Look ahead for a nearby i.pinimg.com URL.
                         let look_end = (search_pos + 2500).min(decoded.len());
@@ -250,13 +250,13 @@ pub async fn scrape_pinterest_html(
                             let mut img_url = look_slice[url_start..url_end].to_string();
                             // Ensure it starts with https://
                             if img_url.starts_with("//") {
-                                img_url = format!("https:{}", img_url);
+                                img_url = format!("https:{img_url}");
                             } else if !img_url.starts_with("http") {
-                                img_url = format!("https://{}", img_url);
+                                img_url = format!("https://{img_url}");
                             }
 
                             if img_url.contains("i.pinimg.com") {
-                                let key = format!("{}::{}", pin_href, img_url);
+                                let key = format!("{pin_href}::{img_url}");
                                 if !seen.contains(&key) {
                                     seen.insert(key);
                                     out.push(ScrapedPin {

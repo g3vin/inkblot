@@ -126,7 +126,7 @@ pub fn print_webview(
                         paper_width_pt,
                         paper_height_pt,
                         pdf_path.as_deref(),
-                    )
+                    );
                 };
             })
             .map_err(|e| format!("Failed to print: {e}"))?;

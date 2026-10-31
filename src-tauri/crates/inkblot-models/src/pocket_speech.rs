@@ -449,7 +449,7 @@ impl PocketEngine {
                         count,
                         received,
                         total,
-                    })
+                    });
                 },
             )
             .await?;

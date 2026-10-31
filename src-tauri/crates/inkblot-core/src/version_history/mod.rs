@@ -110,7 +110,7 @@ pub fn text_words(text: &str) -> Vec<String> {
     WHITESPACE_RE
         .split(text)
         .filter(|word| !word.is_empty())
-        .map(|word| word.to_string())
+        .map(std::string::ToString::to_string)
         .collect()
 }
 

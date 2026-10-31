@@ -38,7 +38,7 @@ pub(super) fn page_setup() -> crate::types::PageSetup {
         },
         verso_header: Some(RunningText {
             center: "{title}".into(),
-            ..blank.clone()
+            ..blank
         }),
         verso_footer: None,
         header_distance_mm: 9.525,
@@ -353,7 +353,7 @@ pub(super) fn every_command() -> Vec<NativeCommand> {
         NativeCommand::MoveEntry(MoveEntryCommand {
             path: "Part One".into(),
             is_folder: true,
-            target_folder: "".into(),
+            target_folder: String::new(),
         }),
         NativeCommand::DeleteEntry(DeleteEntryCommand {
             path: "Part One/Chapter 1".into(),
@@ -729,8 +729,8 @@ pub(super) fn a_reference() -> Reference {
         ]
         .into_iter()
         .collect(),
-        annotation: "".into(),
-        note: "".into(),
+        annotation: String::new(),
+        note: String::new(),
         tags: vec![],
         status: ReferenceStatus::Complete,
         origin: Some(ReferenceOrigin {
@@ -1081,7 +1081,7 @@ pub(super) fn every_event() -> Vec<WebviewEvent> {
                 fields: vec![ReferenceFieldSpec {
                     key: "title".into(),
                     label: "Title".into(),
-                    placeholder: "".into(),
+                    placeholder: String::new(),
                     input: ReferenceFieldInput::Text,
                     required: true,
                 }],

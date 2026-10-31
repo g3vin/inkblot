@@ -524,7 +524,7 @@ pub fn search_project(
                 let note_id = note["id"]
                     .as_str()
                     .map(str::to_string)
-                    .unwrap_or(index.to_string());
+                    .unwrap_or_else(|| index.to_string());
                 results.push(SearchResult {
                     id: format!("note-{}-{note_id}", entry.path),
                     result_type: SearchResultType::NoteMatch,

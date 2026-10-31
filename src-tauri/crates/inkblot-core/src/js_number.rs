@@ -94,7 +94,7 @@ pub fn format_js_number(value: f64) -> String {
 fn round_half_to_even(magnitude: f64, digits: &str, n: i32) -> Option<(String, i32)> {
     let k = digits.len();
 
-    let one_more = format!("{:.*e}", k, magnitude);
+    let one_more = format!("{magnitude:.k$e}");
     let (mantissa, _) = one_more.split_once('e')?;
     let rounded: String = mantissa.chars().filter(|c| *c != '.').collect();
     if !rounded.ends_with('5') {

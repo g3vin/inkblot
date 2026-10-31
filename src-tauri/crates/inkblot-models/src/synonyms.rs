@@ -158,7 +158,7 @@ impl SynonymEngine {
                     count,
                     received,
                     total,
-                })
+                });
             })
             .await?;
         }
@@ -325,7 +325,7 @@ mod tests {
     fn ranking_skips_the_word_itself() {
         let vocab: Vec<String> = ["happy", "glad", "sad", "joyful"]
             .iter()
-            .map(|s| s.to_string())
+            .map(|s| (*s).to_string())
             .collect();
         let ranked = rank(&[0.99, 0.9, -0.8, 0.7], &vocab, "happy");
         assert_eq!(ranked.synonyms, vec!["glad", "joyful", "sad"]);
