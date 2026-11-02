@@ -12,7 +12,8 @@ The protocol is defined once in Rust and generated into TypeScript. Do these in 
    layout there (`command`, `event`, `sidebar`, `tabs`, `timeline`, `envelope`).
 2. Add a **named** payload struct and the enum variant. A place in a document is a
    `TextAnchor`, never a bare position.
-3. Add the wire-name test in `bridge/tests.rs` (grep for an existing variant's test and copy it).
+3. Add an instance to `every_command` / `every_event` in `bridge/tests/fixtures.rs`, and its
+   wire name to the matching test in `bridge/tests/mod.rs` (copy an existing variant's line).
 4. Run `npm run types`. Never hand-edit `src/types/inkblot-core.ts`. For typeshare's
    limits (no flatten, HashMap not BTreeMap, enum literals), see ARCHITECTURE.md →
    Recipes → A domain type.

@@ -6,42 +6,33 @@
  * floating card holding the toolbar and the editor canvas. A sidebar that is not
  * pinned hides and hovers over the card when the pointer reaches its window edge;
  * the buttons in the card's top corners pin and unpin them. Also hosts
- * cross-cutting UI behaviors: the custom window-drag titlebar, fullscreen
- * chrome detection, the right-click context menu, "jump to text" for notes
- * and search results, and the Bubble editor's sessions (EditorCanvas draws one in its
- * pane, and its bar takes over the toolbar).
+ * cross-cutting UI behaviors: the custom window-drag titlebar and fullscreen
+ * chrome detection (useWindowChrome), the right-click context menu, "jump to text"
+ * for notes and search results (useJumpToText), Print Layout's actions
+ * (useLayoutPrintActions), and the Bubble editor's sessions (EditorCanvas draws one
+ * in its pane, and its bar takes over the toolbar).
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { resolveAnchor } from '../bridge/anchors'
 import { documentSurface, shellBridge, useBridgeEvent, useBridgeState, useLatestBridgeState } from '../bridge'
 import { EditorTarget } from '../types'
 import { FILETREE_NEW_ENTRY, IMPORT_SCRIPT, PAGE_SETUP } from '../lib/appEvents'
 
 /** A stable identity, so useBridgeState's initial value is not a new object each render. */
 const EMPTY_ACTIVE_EDITOR = {}
-import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window'
+import { useWindowChrome } from '../hooks/useWindowChrome'
+import { useJumpToText } from '../hooks/useJumpToText'
 import { useSidebarCommands } from '../hooks/useSidebarCommands'
 import EditorCanvas from './EditorCanvas'
-import usePrintLayoutController from '../print/usePrintLayoutController'
 import PageSetupSheet from '../print/PageSetupSheet'
-import { measurePrint, runPrintJob } from '../print/printJob'
-import { runExport, runExportAllEditions } from '../print/export/runExport'
+import { useLayoutPrintActions } from '../print/useLayoutPrintActions'
 import { importFountainScript } from '../script/importScript'
-import { bookFolderFor } from '../print/compile'
-import { getBookForDoc, getBookSettings, getPrintScope, setMeasurement } from '../print/printLayoutStore'
-import { TYPESET_MILESTONE_EVENT } from '../print/useTypesetHistory'
 
-/** What a format is called in the typeset history: "Exported PDF". */
-const EXPORT_NAMES = { pdf: 'PDF', epub: 'EPUB', docx: 'Word', html: 'HTML', markdown: 'Markdown', plainText: 'Plain text', fountain: 'Fountain', fdx: 'Final Draft' }
-const milestone = (label) => window.dispatchEvent(new CustomEvent(TYPESET_MILESTONE_EVENT, { detail: { label } }))
 import LeftSidebar from './LeftSidebar'
 import RightSidebar from './RightSidebar/RightSidebar'
 import FindBar from './FindBar'
 import { useResizableSidebar } from '../hooks/useResizableSidebar'
 import { useEditorContextMenu } from '../hooks/useEditorContextMenu'
 import { isCanvasDoc, isMapDoc, isTextDoc, isTimelineDoc } from '../lib/docKind'
-import { requestCanvasReveal } from '../canvas/canvasEvents'
-import { requestMapReveal } from '../map/mapEvents'
 import { CanvasToolbarSlotContext, NATIVE_CANVAS_TOOLBAR } from '../canvas/canvasToolbarSlot'
 import { CompareToolbarSlotContext } from './compareToolbarSlot'
 import { paragraphForBubble, selectionForBubble, useBubbleSessions } from '../hooks/useBubbleSessions'
@@ -61,32 +52,13 @@ import { requestFind, requestMapFind } from '../lib/sidebarSearch'
 import { refreshFolderPresets } from '../lib/folderPresets'
 import FolderPresetsSheet from './FolderPresetsSheet'
 import { refreshLocks, setDocumentLocked, setFolderLocked, useLockReason, useLocks } from '../lib/docLocks'
-import { currentTrafficLights, DEFAULT_TRAFFIC_LIGHTS, placeTrafficLights, TRAFFIC_LIGHT_DIAMETER, TRAFFIC_LIGHT_SPACING } from '../lib/trafficLights'
+import { placeTrafficLights } from '../lib/trafficLights'
 import { rememberCardRect } from '../lib/landingCard'
 import { SPRINGS, springEasing } from '../ui/physics.js'
 import SelectionWheel from './SelectionWheel'
 
 // Room in the card's toolbar row for a corner's pin button.
 const CARD_TOGGLE_WIDTH = 44
-
-// The green (fullscreen) traffic light's box, from where the lights were last put
-// (lib/trafficLights.js), padded a few px so a click near its edge still counts.
-const fullscreenButtonBox = () => {
-  const lights = currentTrafficLights()
-  const left = lights.x + TRAFFIC_LIGHT_SPACING * 2
-  return {
-    visible: lights.visible,
-    left: left - 4,
-    right: left + TRAFFIC_LIGHT_DIAMETER + 6,
-    top: lights.centerY - 14,
-    bottom: lights.centerY + 14,
-  }
-}
-
-// Drag strip, as in Apple's own apps: a full-width band centered on the traffic
-// lights, reaching from the top of the window to as far below their centers as
-// the window top is above them.
-const WINDOW_DRAG_STRIP_HEIGHT = DEFAULT_TRAFFIC_LIGHTS.centerY * 2
 
 /** How long a hovering sidebar takes to slide in (--spring-smooth): its lights wait for it. */
 const PEEK_SETTLE_MS = springEasing(SPRINGS.smooth).duration
@@ -100,28 +72,6 @@ const getLiveEditor = (editor) => {
   return editor
 }
 
-// Elements inside the drag strip that should receive clicks instead of starting a window drag.
-const WINDOW_DRAG_BLOCKER_SELECTOR = [
-  'button',
-  'input',
-  'select',
-  'textarea',
-  'a',
-  'label',
-  '[role="button"]',
-  '[contenteditable="true"]',
-  '.dictation-popover',
-  '.read-aloud-popover',
-  '.resizer',
-  // The split divider reaches up under the drag strip (the titlebar is only 44px
-  // tall, the strip is 72px), so without this its top would move the window.
-  '.split-resizer',
-  // Owns its own drag gestures (panning, moving nodes) in the band the strip
-  // overhangs below the toolbar.
-  '.canvas-surface',
-  '.map-surface',
-].join(',')
-
 export default function EditorLayout(props) {
   const left = useResizableSidebar(220, 200, 340, 'left')
   const right = useResizableSidebar(300, 260, 520, 'right')
@@ -132,8 +82,6 @@ export default function EditorLayout(props) {
   useLayoutEffect(() => () => rememberCardRect(documentCardRef?.current), [documentCardRef])
   // Use splitView/secondaryDoc from props (managed at top-level `Editor`) to avoid
   // shadowing state and keep all parts of the UI in sync.
-  const [pendingSearchTarget, setPendingSearchTarget] = useState(null)
-  const [isFullscreenChrome, setIsFullscreenChrome] = useState(false)
   // Focus mode is 'open', 'leaving' (zooming back onto the page, still drawn) or
   // 'closed'. Asking it to close while open lets it leave; it reports when it has.
   const [focusMode, setFocusMode] = useState('closed')
@@ -149,8 +97,6 @@ export default function EditorLayout(props) {
   // The inspector's foot, where the word count goes while the inspector is docked.
   const [inspectorFooter, setInspectorFooter] = useState(null)
   const openRightSidebar = right.open
-  const pendingSearchTargetRef = useRef(null)
-  const fullscreenChromeRef = useRef(false)
   const {
     activeDoc,
     activeEditor,
@@ -251,112 +197,7 @@ export default function EditorLayout(props) {
   // The toolbar arrives with the document it acts on (Editor's RevealGate), not on its own.
   const toolbarReveal = useReveal(comparing || Boolean(toolbarContext) || !(activeDoc || currentDoc))
 
-  // Custom titlebar: a left-click anywhere in the drag strip moves the window,
-  // unless it landed on something interactive. Bound to the window rather than
-  // the titlebar element so the strip also covers the sidebars beneath it.
-  useEffect(() => {
-    const handleWindowDragMouseDown = (event) => {
-      if (event.button !== 0) return
-      if (event.clientY > WINDOW_DRAG_STRIP_HEIGHT) return
-      if (event.target instanceof Element && event.target.closest(WINDOW_DRAG_BLOCKER_SELECTOR)) {
-        return
-      }
-
-      event.preventDefault()
-      getCurrentWindow().startDragging().catch(error => {
-        console.warn('Failed to start window drag:', error)
-      })
-    }
-
-    window.addEventListener('mousedown', handleWindowDragMouseDown, true)
-    return () => window.removeEventListener('mousedown', handleWindowDragMouseDown, true)
-  }, [])
-
-  // Track (and predict) fullscreen state so the layout can restyle its chrome.
-  // macOS reports fullscreen late during the animation, so we also treat
-  // near-monitor-sized windows and clicks on the green traffic-light button as
-  // fullscreen, then re-sync with the real state once things settle.
-  useEffect(() => {
-    let cancelled = false
-    let unlistenResize = null
-    let settleTimeout = null
-    const appWindow = getCurrentWindow()
-
-    const setFullscreenChrome = (nextFullscreen) => {
-      fullscreenChromeRef.current = nextFullscreen
-      setIsFullscreenChrome(nextFullscreen)
-    }
-
-    const syncFullscreen = async (event) => {
-      try {
-        const nextFullscreen = await appWindow.isFullscreen()
-        if (cancelled) return
-
-        if (nextFullscreen) {
-          setFullscreenChrome(true)
-          return
-        }
-
-        const size = event?.payload
-        const monitor = size ? await currentMonitor() : null
-        if (!cancelled && monitor?.size && size) {
-          const nearFullscreenSize =
-            size.width >= monitor.size.width * 0.94 &&
-            size.height >= monitor.size.height * 0.9
-
-          if (nearFullscreenSize) {
-            setFullscreenChrome(true)
-            window.clearTimeout(settleTimeout)
-            settleTimeout = window.setTimeout(() => {
-              void syncFullscreen()
-            }, 900)
-            return
-          }
-        }
-
-        setFullscreenChrome(false)
-      } catch {
-        if (!cancelled) setFullscreenChrome(false)
-      }
-    }
-
-    const handleFullscreenButtonPointerDown = (event) => {
-      if (event.button !== 0) return
-      const box = fullscreenButtonBox()
-      if (!box.visible) return
-      if (event.clientX < box.left || event.clientX > box.right) return
-      if (event.clientY < box.top || event.clientY > box.bottom) return
-
-      setFullscreenChrome(!fullscreenChromeRef.current)
-      window.clearTimeout(settleTimeout)
-      settleTimeout = window.setTimeout(() => {
-        void syncFullscreen()
-      }, 1200)
-    }
-
-    void syncFullscreen()
-    window.addEventListener('pointerdown', handleFullscreenButtonPointerDown, true)
-    appWindow.onResized(syncFullscreen)
-      .then((unlisten) => {
-        if (cancelled) {
-          unlisten?.()
-        } else {
-          unlistenResize = unlisten
-        }
-      })
-      .catch(() => {})
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(settleTimeout)
-      window.removeEventListener('pointerdown', handleFullscreenButtonPointerDown, true)
-      unlistenResize?.()
-    }
-  }, [])
-
-  useEffect(() => {
-    pendingSearchTargetRef.current = pendingSearchTarget
-  }, [pendingSearchTarget])
+  const isFullscreenChrome = useWindowChrome()
 
   const openRightSidebarTab = useCallback((tab) => {
     setSidebarTab(tab)
@@ -520,151 +361,18 @@ export default function EditorLayout(props) {
     return () => window.removeEventListener(FILETREE_NEW_ENTRY, reveal)
   }, [openLeftSidebar])
 
-  // Select and scroll to a note's text in the active editor. Accepts a note object
-  // (which carries stored from/to) or a plain anchor string. `resolveAnchor` only
-  // trusts the stored positions if they still cover the anchor text.
-  const jumpToText = useCallback((noteOrAnchor) => {
-    const currentEditor = activeEditor || editor
-    if (!currentEditor) return
+  const { jumpToText, openSearchTarget } = useJumpToText({ activeEditor, editor, activeDoc, currentDoc, setActiveDoc, setCurrentDoc })
 
-    const note = typeof noteOrAnchor === 'object' && noteOrAnchor !== null
-      ? noteOrAnchor
-      : null
-    const text = typeof noteOrAnchor === 'string' ? noteOrAnchor : note?.anchor
-    if (!text) return
-
-    const range = resolveAnchor(currentEditor, {
-      from: Number.isFinite(note?.from) ? note.from : -1,
-      to: Number.isFinite(note?.to) ? note.to : -1,
-      text,
-    })
-
-    // Null means the text is gone. Doing nothing is the right answer: the note has
-    // lost what it was about, and a guessed position is worse than no movement.
-    if (!range) return
-
-    currentEditor
-      .chain()
-      .focus()
-      .setTextSelection({
-        from: range.from,
-        to: range.to > range.from ? range.to : range.from,
-      })
-      .scrollIntoView()
-      .run()
-  }, [activeEditor, editor])
-
-  // Open a search result: jump immediately if its doc is already open,
-  // otherwise switch documents and queue the jump for after the editor loads.
-  const openSearchTarget = useCallback((target) => {
-    if (!target) return
-
-    const docName = target.docName || activeDoc || currentDoc
-    if (!docName) return
-
-    const normalizedTarget = {
-      ...target,
-      docName,
-    }
-
-    // A canvas hit has no document position to jump to — it names a node. Ask for
-    // the reveal and switch documents if needed; the canvas claims the request
-    // whether it is already mounted or about to be (see canvasEvents).
-    if (isCanvasDoc(docName)) {
-      if (docName !== activeDoc && docName !== currentDoc) {
-        setActiveDoc(docName)
-        setCurrentDoc(docName)
-      }
-      if (normalizedTarget.nodeId) {
-        requestCanvasReveal(docName, normalizedTarget.nodeId)
-      }
-      return
-    }
-
-    // A map hit names an item (pin, route, label…) the same way.
-    if (isMapDoc(docName)) {
-      if (docName !== activeDoc && docName !== currentDoc) {
-        setActiveDoc(docName)
-        setCurrentDoc(docName)
-      }
-      if (normalizedTarget.nodeId) {
-        requestMapReveal(docName, normalizedTarget.nodeId)
-      }
-      return
-    }
-
-    if (docName === activeDoc || docName === currentDoc) {
-      if (normalizedTarget.skipJump) return
-      jumpToText(
-        normalizedTarget.note || {
-          anchor: normalizedTarget.anchor,
-          from: normalizedTarget.from,
-          to: normalizedTarget.to,
-        }
-      )
-      return
-    }
-
-    setActiveDoc(docName)
-    setCurrentDoc(docName)
-    if (!normalizedTarget.skipJump) {
-      setPendingSearchTarget(normalizedTarget)
-    }
-  }, [activeDoc, currentDoc, jumpToText, setActiveDoc, setCurrentDoc])
-
-  // The right sidebar's state and edits, for a shell that draws the sidebar itself.
-  // Here, after openSearchTarget, because a hook argument is read during render.
   // Print Layout, Print… and Export, for whichever document is active.
-  const printOptions = useCallback((scope) => {
-    const projectName = props.projectName
-    const docPath = activeDoc || currentDoc
-    return {
-      projectName,
-      docPath,
-      liveEditors: [
-        { path: currentDoc, editor },
-        { path: props.secondaryDoc, editor: props.secondaryEditor },
-      ],
-      // Printed alone, a document takes its book's setup when it has none — the book
-      // the Finishing tabs show, under the project's scope.
-      book: scope === 'document' ? getBookForDoc(projectName, docPath) : getBookSettings(projectName, bookFolderFor(docPath, scope)),
-    }
-  }, [activeDoc, currentDoc, editor, props.projectName, props.secondaryDoc, props.secondaryEditor])
-  const printLayout = usePrintLayoutController({
+  const printLayout = useLayoutPrintActions({
     projectName: props.projectName,
-    activeDoc: activeDoc || currentDoc,
+    activeDoc,
     currentDoc,
     secondaryDoc: props.secondaryDoc,
     editor,
     secondaryEditor: props.secondaryEditor,
-    // What a print or an export was made from is kept in the typeset history.
-    onPrint: ({ scope, bound, options }) => {
-      runPrintJob({ ...printOptions(scope), scope, bound, options })
-        .then((done) => { if (done !== false && !options?.report) milestone(bound ? 'Printed for binding' : 'Printed') })
-        .catch((error) => console.error('[print] failed:', error))
-    },
-    onExport: ({ format, scope, bound, options, path }) => {
-      runExport({ ...printOptions(scope), format, scope, bound, options, path })
-        .then((written) => { if (written) milestone(`Exported ${EXPORT_NAMES[format] || format}`) })
-        .catch((error) => console.error('[export] failed:', error))
-    },
-    onExportAllEditions: () => {
-      const scope = getPrintScope(props.projectName) === 'project' ? 'project' : 'folder'
-      runExportAllEditions({ ...printOptions(scope), scope })
-        .then((done) => { if (done?.written?.length) milestone(`Exported ${done.written.length} files for every edition`) })
-        .catch((error) => console.error('[export] every edition failed:', error))
-    },
-    // A page of the book's own — a dedication — opened from the Book navigator.
-    onOpenDoc: (path) => {
-      setActiveDoc(path)
-      setCurrentDoc(path)
-    },
-    onMeasure: ({ scope }) => {
-      const { projectName, docPath } = printOptions(scope)
-      measurePrint({ ...printOptions(scope), scope })
-        .then((measured) => { if (measured) setMeasurement(projectName, scope, docPath, measured) })
-        .catch((error) => console.error('[measure] failed:', error))
-    },
+    setActiveDoc,
+    setCurrentDoc,
   })
 
   // File ▸ Import Fountain Script…: a new document beside the open one, opened in a tab.
@@ -691,6 +399,8 @@ export default function EditorLayout(props) {
     return () => window.removeEventListener(PAGE_SETUP, open)
   }, [])
 
+  // The right sidebar's state and edits, for a shell that draws the sidebar itself.
+  // Here, after openSearchTarget, because a hook argument is read during render.
   useSidebarCommands({
     projectName: props.projectName,
     activeDoc,
@@ -711,45 +421,6 @@ export default function EditorLayout(props) {
     onOpenDocInTab: props.onOpenDocInTab,
     openSearchTarget,
   })
-
-  // Complete a queued search jump once the target document's editor is mounted
-  // (retries briefly while the editor initializes).
-  useEffect(() => {
-    if (!pendingSearchTarget || pendingSearchTarget.docName !== currentDoc) return
-
-    let cancelled = false
-    let attempts = 0
-
-    const tryJump = () => {
-      if (cancelled) return
-      const target = pendingSearchTargetRef.current
-      if (!target || target.docName !== currentDoc) return
-
-      if (!editor) {
-        if (attempts < 8) {
-          attempts += 1
-          window.setTimeout(tryJump, 80)
-        }
-        return
-      }
-
-      jumpToText(
-        target.note || {
-          anchor: target.anchor,
-          from: target.from,
-          to: target.to,
-        }
-      )
-      setPendingSearchTarget(null)
-    }
-
-    const timeoutId = window.setTimeout(tryJump, 100)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timeoutId)
-    }
-  }, [currentDoc, editor, jumpToText, pendingSearchTarget])
 
   const sidebarResizing = left.resizing || right.resizing
 

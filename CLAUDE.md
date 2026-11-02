@@ -84,7 +84,7 @@ Full standard: [CONTRIBUTING.md → Comments](CONTRIBUTING.md#comments).
 
 Must pass before you commit ([README → Checks](README.md#checks)):
 
-- `npm run check` (lint with 0 warnings, lint:design, typecheck, tests), then `npm run build`.
+- `npm run check` (lint with 0 warnings, lint:design, lint:size, typecheck, tests), then `npm run build`.
 - Rust or a mirrored module touched: `npm run check:rust` (fmt, clippy, cargo test, parity,
   types:check), then `cd src-tauri && cargo build -q --workspace`.
 

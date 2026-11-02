@@ -569,18 +569,18 @@ pub enum NativeCommand {
     SetCitationStyle(SetCitationStyleCommand),
     SetBibliographyOptions(SetBibliographyOptionsCommand),
     SetEditorMode(SetEditorModeCommand),
-    /* The Book navigator (`print.rs`). */
+    /* The Book navigator (`print/book.rs`). */
     MoveBookItem(MoveBookItemCommand),
     SetBookItemHidden(SetBookItemHiddenCommand),
     AddBookItem(AddBookItemCommand),
     RemoveBookItem(RemoveBookItemCommand),
     EditBookItem(EditBookItemCommand),
     OpenBookItem(OpenBookItemCommand),
-    /* Chapter openings and book styles (`print.rs`). */
+    /* Chapter openings and book styles (`print/mod.rs`). */
     ApplyBookStyle(ApplyBookStyleCommand),
     SetChapterMeta(SetChapterMetaCommand),
     SetHeadImage(SetHeadImageCommand),
-    /* Covers (`print.rs`). */
+    /* Covers (`print/covers.rs`). */
     SetFolderBookOptions(SetFolderBookOptionsCommand),
     SetTypesetView(SetTypesetViewCommand),
     SetParagraphTypeset(SetParagraphTypesetCommand),
@@ -593,7 +593,7 @@ pub enum NativeCommand {
     ExportAllEditions(ExportAllEditionsCommand),
     SetCoverImage(SetCoverImageCommand),
     EditCoverSets(EditCoverSetsCommand),
-    /* The typeset history (`print.rs`). */
+    /* The typeset history (`print/typeset.rs`). */
     SaveTypesetVersion(SaveTypesetVersionCommand),
     RestoreTypesetVersion(TypesetVersionRef),
     RenameTypesetVersion(RenameTypesetVersionCommand),

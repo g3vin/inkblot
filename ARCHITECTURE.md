@@ -57,7 +57,7 @@ round-tripped through JSON (`src/bridge/transport.ts`).
 | Commands | The ⌘K registry every action joins | `src/lib/commands.ts` |
 | Reducers | Canvas and map state, with undo as snapshots | `src/canvas/canvasReducer.ts`, `src/map/mapReducer.ts` |
 | Timeline store | The project's one chronology, with previews and undo | `src/lib/timeline/timelineStore.js` |
-| `ProjectStore` | Rust persistence: projects, documents, versions, locations | `inkblot-core/src/store/mod.rs` |
+| `ProjectStore` | Rust persistence: projects, documents, versions, locations | `inkblot-core/src/store/` (one file per concern) |
 | UI primitives | Every control the chrome is built from | `src/ui/`, [docs/DESIGN.md](docs/DESIGN.md) |
 | Motion | The springs, projection, rubber band and coasting every motion is built from; CSS gets the same springs as generated `--spring-*` tokens, script drives them through one shared frame loop | `src/ui/physics.js`, `src/ui/useSpring.js`, `scripts/gen-spring-tokens.mjs` |
 | Reveal gate | Opening a project shows the file tree, both panes, the toolbar and the checked tabs together; each reports ready. Opened from a pile on the landing page, it also waits for the sheet's flight to land (`'arrival'`) | `Editor.jsx` (`RevealGate`), `src/ui/Reveal.jsx`, `src/lib/projectPrefetch.js` |
@@ -263,7 +263,7 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
   edges with hidden lines removed in a software depth buffer (`plotModel.js`).
 - **Maps nest by links.** A system in a galaxy, a galaxy in a group, is a pin whose
   `doc` is a `.map`; a body's surface is `body.surface`. `mapAncestry.js` reads the
-  links backwards for the breadcrumb, and `openLinkedMap` writes the new map, links
+  links backwards for the breadcrumb, and `openLinkedMap` (`map/useMapLinks.js`) writes the new map, links
   it and saves before opening it, so the trail is there at once.
 - **Online is opt-in.** Every map works offline. Satellite pictures, street detail,
   terrain and place search (`lib/map/onlineMaps.js`) are fetched only once the writer
@@ -350,10 +350,10 @@ The mirrored modules (each JS file names its twin on a `Mirrors:` line, which
 | `canvasGeometry.js` | `canvas_geometry.rs` |
 | `canvasModel.js` | `canvas_model.rs` |
 | `storyStructure.js` | `story_structure.rs` |
-| `versionHistory.js` | `version_history.rs` |
-| `versionStore.js` | `store/versions.rs` |
+| `versionHistory.js` | `version_history/` (`mod.rs`, `text_diff.rs`, `canvas_diff.rs`) |
+| `versionStore.js` | `store/versions.rs` (pure), `store/version_io.rs` (on disk) |
 | `projectPaths.ts` | `store/paths.rs` |
-| `FileSystem.js`, `projectLocations.js` | `store/mod.rs`, `store/locations.rs` |
+| `FileSystem.js`, `projectLocations.js` | `store/` (`mod.rs`, `documents.rs`, `entries.rs`, `projects.rs`), `store/locations.rs` |
 | `sidebarSearch.js`, `canvasSearch.js` | `search/mod.rs` |
 | `readAloud.js` (the chunker) | `read_aloud.rs` |
 | `noteUtils.js`, `audioNotes.js` (the normalizers) | `notes.rs` |

@@ -5,11 +5,11 @@
  * creating/renaming files, folders, story-preset folders, and projects;
  * custom (mouse-driven) drag & drop for reordering and re-parenting entries;
  * and per-project persistence of manual ordering and folder expansion in
- * the preference store. Other parts of the app talk to it through `filetree:*`
+ * the preference store (useFileTreeState). Other parts of the app talk to it through `filetree:*`
  * window events (new-entry, refresh-projects, folders-visibility, selection, …).
  *
  * Rows can be chosen together (⌘-click, ⇧-click; treeSelection.js) and then deleted,
- * moved or put in a new folder at once. The selection lives here; the context menu
+ * moved or put in a new folder at once. The selection lives in useTreeSelection; the context menu
  * reads it off the rows (`data-selected`) and asks for an action with
  * `filetree:selection`.
  */
@@ -17,32 +17,31 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
-  listProjects,
   createProject,
   listProjectTree,
   createFolder,
 } from '../lib/FileSystem'
-import { deleteEntries, moveEntries, topmostEntries } from '../lib/entryOperations'
-import { isEntryEmpty } from '../lib/emptiness'
 import { useCommands } from '../lib/commands'
-import { allEntryIds, clickRow, entryId, entryOf, pruneSelection, visibleEntryIds } from '../lib/treeSelection'
-import { readProjectTree, recallProjects, recallTree, rememberProjects, rememberTree } from '../lib/projectPrefetch'
+import { visibleEntryIds } from '../lib/treeSelection'
+import { recallTree } from '../lib/projectPrefetch'
 import { createDocumentOfKind, nameForKind } from '../lib/createDocument'
 import { getDocDisplayName, getDocKind, stripDocSuffix } from '../lib/docKind'
 import Icon from '../ui/Icon.jsx'
 import { IconButton, Inlay, InlaySlot, SPRINGS, SkeletonOverlay, SkeletonRows, popUpMenu, toFramer, useReveal, useRevealReady } from '../ui'
 import { useFileTreeDrag } from '../hooks/useFileTreeDrag'
+import { useFileTreeState } from '../hooks/useFileTreeState'
+import { useTreeSelection } from '../hooks/useTreeSelection'
 import { deriveFileNodeState, docKindIcon } from '../lib/fileTreeNodeState'
 import { EMPTY_FILTER, TREE_KINDS, applyTreeFilter, folderPaths } from '../lib/treeFilter'
 import { noteOpened } from '../lib/recentDocs'
-import { lockReason, refreshLocks, useLocks } from '../lib/docLocks'
+import { lockReason, useLocks } from '../lib/docLocks'
 import { openFolderPresets, useFolderPresets } from '../lib/folderPresets'
 import { inkColor } from '../lib/palette'
 import {
   getStoryFolderAncestor,
   getStoryFolderPresetByKey,
 } from '../lib/storyStructure'
-import { FILETREE_FOLDERS_VISIBILITY, FILETREE_NEW_ENTRY, FILETREE_NEW_PROJECT, FILETREE_REFRESH_PROJECTS, FILETREE_SELECTION, FILETREE_SHOW_PROJECTS } from '../lib/appEvents'
+import { FILETREE_NEW_ENTRY, FILETREE_NEW_PROJECT, FILETREE_SHOW_PROJECTS } from '../lib/appEvents'
 
 const MotionDiv = motion.div
 
@@ -54,19 +53,11 @@ const FOLDER_STICKY_STEP = 22
 import { itemRevealVariants, folderChildrenVariants } from './fileTreeVariants'
 import {
   applyOrderToTree,
-  collectFolderPaths,
   getParentPath,
-  moveInOrder,
   remapExpandedForFolder,
   remapOrderForEntry,
-  remapOrderForFolder,
 } from '../lib/fileTreeOrder'
-import {
-  loadExpanded,
-  loadOrder,
-  saveExpanded,
-  saveOrder,
-} from '../lib/fileTreeState'
+import { saveOrder } from '../lib/fileTreeState'
 
 
 
@@ -77,18 +68,6 @@ const filePathsIn = (node, into = new Set()) => {
   if (node.type === 'file') into.add(node.path)
   for (const child of node.children || []) filePathsIn(child, into)
   return into
-}
-
-const NO_SELECTION = { selection: new Set(), anchor: null }
-
-/** The folder at `path` in a tree, or null. */
-const folderAt = (node, path) => {
-  if (node.type === 'folder' && node.path === path) return node
-  for (const child of node.children || []) {
-    const found = child.type === 'folder' && (path === child.path || path.startsWith(`${child.path}/`)) ? folderAt(child, path) : null
-    if (found) return found
-  }
-  return null
 }
 
 /** Marks a scrolled list, so its stuck folder rows know to cover what passes under them. */
@@ -120,17 +99,14 @@ export default function FileTree({
   const locks = useLocks()
   const presets = useFolderPresets()
   const [view, setView] = useState('files')
-  const [projects, setProjects] = useState(() => recallProjects()?.names ?? null)
-  // A project opened before this session shows the tree it last had at once; the read
-  // below then brings it up to date. `treeFor` is whose tree is showing.
-  const [tree, setTree] = useState(() => recallTree(projectName) ?? { type: 'folder', name: '', path: '', children: [] })
-  const [treeFor, setTreeFor] = useState(() => (recallTree(projectName) ? projectName : ''))
-  const [expanded, setExpanded] = useState(new Set(['']))
+  const {
+    projects, tree, setTree, treeFor, setTreeFor, expanded, setExpanded, expandedRef, orderRef,
+    refreshProjects, refreshTree, updateOrder, updateExpanded, expandPath, order,
+  } = useFileTreeState({ projectName, registerRefreshFiles })
   // Which kinds of file the tree shows (the + menu's Show). Finding by name is the
   // search's, beside the + at the sidebar's foot.
   const [kind, setKind] = useState('all')
   const filtering = kind !== 'all'
-  const [order, setOrder] = useState({})
   const [isAddingEntry, setIsAddingEntry] = useState(false)
   const [newEntryName, setNewEntryName] = useState('')
   const [newEntryType, setNewEntryType] = useState('file')
@@ -156,58 +132,12 @@ export default function FileTree({
   // Where the pointer was last seen during a manual drag. `onUp` receives no event,
   // but it has to know whether the drop landed on a canvas — see the guard there.
   const dragPointRef = useRef(null)
-  const orderRef = useRef({})
-  const expandedRef = useRef(new Set(['']))
-  // The rows chosen together, by entry id, and the anchor a ⇧-click runs from. A
-  // single row is only the last one clicked: the tree marks a selection once it
-  // holds more than one.
-  const [picked, setPicked] = useState(() => (activeDoc ? { selection: new Set([`file:${activeDoc}`]), anchor: `file:${activeDoc}` } : NO_SELECTION))
-  const { selection } = picked
-  const multi = selection.size > 1
   const listRef = useRef(null)
-
-  const refreshProjects = useCallback(async () => {
-    const list = await listProjects()
-    rememberProjects(list)
-    setProjects(list)
-  }, [])
-
-  const refreshTree = useCallback(async () => {
-    if (!projectName) return
-    const nextOrder = loadOrder(projectName)
-    const rawTree = await readProjectTree(projectName)
-    const orderedTree = applyOrderToTree(rawTree, nextOrder)
-    saveOrder(projectName, nextOrder)
-    orderRef.current = nextOrder
-    setOrder(nextOrder)
-    setTree(orderedTree)
-    setTreeFor(projectName)
-    rememberTree(projectName, orderedTree)
-    // Whatever changed the tree may have moved, copied or removed something locked.
-    void refreshLocks(projectName)
-  }, [projectName])
-
-  useEffect(() => {
-    refreshProjects()
-  }, [refreshProjects])
-
-  useEffect(() => {
-    const handler = () => {
-      refreshProjects()
-    }
-    window.addEventListener(FILETREE_REFRESH_PROJECTS, handler)
-    return () => window.removeEventListener(FILETREE_REFRESH_PROJECTS, handler)
-  }, [refreshProjects])
-
-  useEffect(() => {
-    refreshTree()
-  }, [refreshTree])
 
   // Switched to a project this session has shown before: its last tree, until the read lands.
   const [recalledFor, setRecalledFor] = useState(projectName)
   if (recalledFor !== projectName) {
     setRecalledFor(projectName)
-    setPicked(NO_SELECTION)
     const recalled = recallTree(projectName)
     if (recalled) {
       setTree(recalled)
@@ -219,18 +149,6 @@ export default function FileTree({
   useRevealReady('tree', treeReady)
   const treeReveal = useReveal(treeReady)
   const projectsReveal = useReveal(projects !== null, { gated: false })
-
-  useEffect(() => {
-    if (!projectName) return
-    const nextExpanded = new Set(loadExpanded(projectName))
-    expandedRef.current = nextExpanded
-    setExpanded(nextExpanded)
-  }, [projectName])
-
-  useEffect(() => {
-    if (!registerRefreshFiles) return
-    registerRefreshFiles(refreshTree)
-  }, [registerRefreshFiles, refreshTree])
 
   useEffect(() => {
     const handler = () => {
@@ -248,53 +166,6 @@ export default function FileTree({
     window.addEventListener(FILETREE_SHOW_PROJECTS, handler)
     return () => window.removeEventListener(FILETREE_SHOW_PROJECTS, handler)
   }, [])
-
-  useEffect(() => {
-    const nextOrder = loadOrder(projectName)
-    orderRef.current = nextOrder
-    setOrder(nextOrder)
-  }, [projectName])
-
-  const updateOrder = useCallback((updater) => {
-    const next = updater({ ...orderRef.current })
-    orderRef.current = next
-    saveOrder(projectName, next)
-    setOrder(next)
-  }, [projectName])
-
-  const updateExpanded = useCallback((updater) => {
-    const next = updater(new Set(expandedRef.current))
-    expandedRef.current = next
-    if (projectName) saveExpanded(projectName, Array.from(next))
-    setExpanded(next)
-  }, [projectName])
-
-  useEffect(() => {
-    const handler = (event) => {
-      const action = event?.detail?.action
-      if (action === 'expand-all') {
-        updateExpanded(() => new Set(['', ...collectFolderPaths(tree)]))
-      } else if (action === 'collapse-all') {
-        updateExpanded(() => new Set(['']))
-      }
-    }
-
-    window.addEventListener(FILETREE_FOLDERS_VISIBILITY, handler)
-    return () => window.removeEventListener(FILETREE_FOLDERS_VISIBILITY, handler)
-  }, [tree, updateExpanded])
-
-  const expandPath = useCallback((path) => {
-    if (!path) return
-    const parts = path.split('/').filter(Boolean)
-    let acc = ''
-    updateExpanded(prev => {
-      parts.forEach(part => {
-        acc = acc ? `${acc}/${part}` : part
-        prev.add(acc)
-      })
-      return prev
-    })
-  }, [updateExpanded])
 
   const beginNewEntry = useCallback((type = 'file', parent = '') => {
     setView('files')
@@ -509,7 +380,7 @@ export default function FileTree({
     setRenameValue('')
     await refreshTree()
     setArrivedPath(null)
-  }, [projectName, refreshProjects, refreshTree, renamingEntry, renameValue, updateExpanded])
+  }, [orderRef, projectName, refreshProjects, refreshTree, renamingEntry, renameValue, updateExpanded])
 
   // Render helpers (plain functions, not components, so inputs keep focus across re-renders).
 
@@ -604,110 +475,21 @@ export default function FileTree({
 
   // Every entry in the tree's order, and the rows showing, in order: a ⇧-click runs
   // over the rows showing, so nothing in a shut folder is chosen unseen.
-  const orderedIds = useMemo(() => allEntryIds(orderedRoot), [orderedRoot])
   const visibleIds = useMemo(() => visibleEntryIds(shownRoot, shownExpanded), [shownRoot, shownExpanded])
   const visibleAt = useMemo(() => new Map(visibleIds.map((id, index) => [id, index])), [visibleIds])
 
-  // What was deleted or moved away leaves the selection.
-  const presentIds = useMemo(() => new Set(orderedIds), [orderedIds])
-  const kept = pruneSelection(selection, presentIds)
-  if (kept !== selection) setPicked({ selection: kept, anchor: kept.has(picked.anchor) ? picked.anchor : null })
-
-  // A document opened some other way (the search, a link) becomes the row a ⌘- or
-  // ⇧-click starts from, unless several rows are chosen.
-  const [followedDoc, setFollowedDoc] = useState(activeDoc)
-  if (followedDoc !== activeDoc) {
-    setFollowedDoc(activeDoc)
-    if (!multi) setPicked(activeDoc ? { selection: new Set([`file:${activeDoc}`]), anchor: `file:${activeDoc}` } : NO_SELECTION)
-  }
-
-  const chooseRow = (id, keys) => setPicked((current) => clickRow(current, id, visibleIds, keys))
-
-  /** The chosen entries in the tree's order, without any a chosen folder already holds. */
-  const selectedEntries = useCallback(
-    () => topmostEntries(orderedIds.filter((id) => selection.has(id)).map(entryOf)),
-    [orderedIds, selection],
-  )
-
-  // Entries moved into `target` go to the end of its order, in the order they came.
-  const orderMovedInto = useCallback((moved, target) => {
-    updateOrder((orderState) => {
-      let next = orderState
-      for (const entry of moved) {
-        if (entry.type === 'folder') next = remapOrderForFolder(next, entry.path, entry.nextPath)
-        moveInOrder(next, `${entry.type}:${entry.nextPath}`, getParentPath(entry.path), target)
-      }
-      return next
-    })
-  }, [updateOrder])
-
-  const deleteSelection = useCallback(async () => {
-    const entries = selectedEntries()
-    if (!entries.length || !projectName) return
-    const blank = (await Promise.all(entries.map((entry) => isEntryEmpty(projectName, entry.path, entry.type)))).every(Boolean)
-    if (!blank) {
-      const what = entries.length === 1 ? `"${entries[0].path.split('/').pop()}"` : `${entries.length} items`
-      const { confirm } = await import('@tauri-apps/plugin-dialog')
-      const confirmed = await confirm(`Delete ${what}?`).catch(() => false)
-      if (!confirmed) return
-    }
-    await deleteEntries(projectName, entries)
-    setPicked(NO_SELECTION)
-    await refreshTree()
-  }, [projectName, refreshTree, selectedEntries])
-
-  const moveSelection = useCallback(async (target) => {
-    const entries = selectedEntries()
-    if (!entries.length || !projectName) return
-    orderMovedInto(await moveEntries(projectName, entries, target), target)
-    await refreshTree()
-    expandPath(target)
-  }, [expandPath, orderMovedInto, projectName, refreshTree, selectedEntries])
-
-  // A new folder where the first chosen entry was, holding them all, named in place.
-  const groupSelection = useCallback(async () => {
-    const entries = selectedEntries()
-    if (!entries.length || !projectName) return
-    const parent = getParentPath(entries[0].path)
-    const taken = new Set((folderAt(orderedRoot, parent)?.children || []).map((child) => child.name))
-    let name = 'New folder'
-    for (let n = 2; taken.has(name); n += 1) name = `New folder ${n}`
-    const path = parent ? `${parent}/${name}` : name
-
-    await createFolder(projectName, path)
-    updateOrder((orderState) => {
-      const list = (orderState[parent] || []).filter((id) => id !== `folder:${path}`)
-      const at = list.indexOf(entryId(entries[0]))
-      list.splice(at < 0 ? list.length : at, 0, `folder:${path}`)
-      orderState[parent] = list
-      return orderState
-    })
-    orderMovedInto(await moveEntries(projectName, entries, path), path)
-    setPicked({ selection: new Set([`folder:${path}`]), anchor: `folder:${path}` })
-    await refreshTree()
-    expandPath(path)
-    setRenamingEntry({ path, type: 'folder', oldName: name, parent })
-    setRenameValue(name)
-  }, [expandPath, orderMovedInto, orderedRoot, projectName, refreshTree, selectedEntries, updateOrder])
-
-  // The context menu's actions on the selection.
-  useEffect(() => {
-    const handler = (event) => {
-      const { action, target } = event?.detail || {}
-      if (action === 'delete') void deleteSelection()
-      else if (action === 'group') void groupSelection()
-      else if (action === 'move' && typeof target === 'string') void moveSelection(target)
-    }
-    window.addEventListener(FILETREE_SELECTION, handler)
-    return () => window.removeEventListener(FILETREE_SELECTION, handler)
-  }, [deleteSelection, groupSelection, moveSelection])
-
-  const selectAll = useCallback(() => {
-    setPicked({ selection: new Set(visibleIds), anchor: visibleIds[0] ?? null })
-  }, [visibleIds])
-  const clearSelection = useCallback(() => {
-    setPicked(activeDoc ? { selection: new Set([`file:${activeDoc}`]), anchor: `file:${activeDoc}` } : NO_SELECTION)
-  }, [activeDoc])
+  const {
+    selection, multi, setPicked, chooseRow, selectedEntries, deleteSelection, groupSelection, selectAll, clearSelection, onListKeyDown,
+  } = useTreeSelection({
+    projectName,
+    activeDoc,
+    orderedRoot,
+    visibleIds,
+    updateOrder,
+    expandPath,
+    refreshTree,
+    rename: { setRenamingEntry, setRenameValue },
+  })
 
   useCommands(() => [
     { id: 'files.select-all', title: 'Select all files', section: 'Files', icon: 'group', keywords: ['choose', 'multiple'], when: () => view === 'files' && visibleIds.length > 0, run: selectAll },
@@ -715,23 +497,6 @@ export default function FileTree({
     { id: 'files.group-selected', title: `Put ${selection.size} selected items in a new folder`, section: 'Files', icon: 'folder', keywords: ['group', 'move'], when: () => multi, run: groupSelection },
     { id: 'files.clear-selection', title: 'Deselect files', section: 'Files', keywords: ['clear', 'selection'], when: () => multi, run: clearSelection },
   ], [clearSelection, deleteSelection, groupSelection, multi, selectAll, selection.size, view, visibleIds.length])
-
-  // On the list: ⌘A chooses every row showing, Escape lets the selection go, ⌘⌫
-  // deletes what is chosen. Only the list's own keys: a rename box keeps its own.
-  const onListKeyDown = (event) => {
-    if (event.target !== event.currentTarget) return
-    const mod = event.metaKey || event.ctrlKey
-    if (mod && event.key.toLowerCase() === 'a') {
-      event.preventDefault()
-      selectAll()
-    } else if (event.key === 'Escape' && multi) {
-      event.preventDefault()
-      clearSelection()
-    } else if (mod && (event.key === 'Backspace' || event.key === 'Delete') && selection.size) {
-      event.preventDefault()
-      void deleteSelection()
-    }
-  }
 
   const renderNode = (node, depth = 0, siblings = []) => {
     if (!node) return null
@@ -973,13 +738,13 @@ export default function FileTree({
   // Expand or collapse every folder: all open unless all already are.
   const allFoldersOpen = useCallback(
     () => [...folderPaths(orderedRoot)].every((path) => expandedRef.current.has(path)),
-    [orderedRoot],
+    [expandedRef, orderedRoot],
   )
   const toggleAllFolders = useCallback(() => {
     const next = allFoldersOpen() ? new Set(['']) : folderPaths(orderedRoot)
     expandedRef.current = next
     setExpanded(next)
-  }, [allFoldersOpen, orderedRoot])
+  }, [allFoldersOpen, expandedRef, orderedRoot, setExpanded])
 
   // Contextual create button: while a document inside a story-preset folder is
   // open, offer a sibling of the same kind ("New Character" in Characters/…).

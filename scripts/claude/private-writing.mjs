@@ -76,6 +76,45 @@ const expand = (value) => {
   if (!path.isAbsolute(out)) out = path.resolve(cwd, out)
   return strip(out)
 }
+/**
+ * A command's simple commands, each as its words with quotes removed: split on
+ * unquoted `|`, `||`, `&&`, `;`, `&`, newlines and `$(`, so a quoted regex such as
+ * `'^  // |x'` stays one word. Heredoc bodies come out as words too, which is harmless:
+ * only a segment's first word decides whether it is a search.
+ */
+function shellSegments(text) {
+  const segments = [[]]
+  let word = null
+  let quote = null
+  const end = () => {
+    if (word !== null) segments.at(-1).push(word)
+    word = null
+  }
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (quote) {
+      if (c === quote) quote = null
+      else if (c === '\\' && quote === '"' && i + 1 < text.length) word += text[++i]
+      else word += c
+    } else if (c === "'" || c === '"') {
+      quote = c
+      word ??= ''
+    } else if (c === '\\' && i + 1 < text.length) {
+      word = (word ?? '') + text[++i]
+    } else if (/\s/.test(c) && c !== '\n') {
+      end()
+    } else if (c === '\n' || c === ';' || c === '|' || c === '&' || (c === '$' && text[i + 1] === '(')) {
+      end()
+      if (c === '$') i++
+      if (segments.at(-1).length) segments.push([])
+    } else {
+      word = (word ?? '') + c
+    }
+  }
+  end()
+  return segments.filter((segment) => segment.length)
+}
+
 const inside = (target) => PROTECTED.some((root) => target === root || target.startsWith(root + path.sep) || target.startsWith(root + '/'))
 const names = (text) => text.includes(ID) || PROTECTED.some((root) => text.includes(root) || text.includes(root.replace(HOME, '~')))
 // In a shell command the identifier counts only as a path or a bare word: beside a
@@ -87,9 +126,17 @@ const commandNames = (text) => PATH_LIKE.test(text) || PROTECTED.some((root) => 
 if (tool === 'Bash') {
   const command = String(args.command ?? '')
 
-  // A recursive search rooted at home or / walks into the protected folders.
-  const broad = /\b(rg|grep|find|fd|ag|ack|du|tree)\b[^|;&]*\s(~|\$HOME|\$\{HOME\}|\/|\/Users|\/home|\/Users\/[^/\s]+|\/home\/[^/\s]+)\/?(\s|$)/
-  if (broad.test(command) || (HOME && new RegExp(`\\b(rg|grep|find|fd|ag|ack|du|tree)\\b[^|;&]*\\s['"]?${HOME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/?['"]?(\\s|$)`).test(command))) block()
+  // A recursive search rooted at home or / walks into the protected folders. Judged per
+  // shell segment, on the segment's own command word, so prose in a heredoc ("grep for
+  // it … a / b") isn't mistaken for a search.
+  const SEARCH = new Set(['rg', 'grep', 'egrep', 'find', 'fd', 'ag', 'ack', 'du', 'tree', 'ls'])
+  const ROOT = /^(~|\$HOME|\$\{HOME\}|\/|\/Users(\/[^/\s]+)?|\/home(\/[^/\s]+)?)\/?$/
+  for (const words of shellSegments(command)) {
+    while (words.length && (/^\w+=/.test(words[0]) || ['sudo', 'xargs', 'command', 'time', 'nice', 'env'].includes(words[0]))) words.shift()
+    if (!SEARCH.has(words[0])) continue
+    const recursive = words[0] !== 'ls' || words.some((word) => /^-[a-zA-Z]*R/.test(word))
+    if (recursive && words.slice(1).some((word) => ROOT.test(word) || expand(word) === HOME)) block()
+  }
 
   if (!commandNames(command)) process.exit(0)
 

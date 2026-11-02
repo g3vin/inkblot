@@ -9,7 +9,7 @@
  * Retention: at most 200 unnamed entries, evicted oldest first; named versions are
  * never evicted.
  *
- * Mirrors: `src-tauri/crates/inkblot-core/src/store/versions.rs`; `npm run parity` asserts they agree.
+ * Mirrors: `src-tauri/crates/inkblot-core/src/store/versions.rs`, `src-tauri/crates/inkblot-core/src/store/version_io.rs`; `npm run parity` asserts they agree.
  */
 import { writeTextFile, readTextFile, mkdir } from '@tauri-apps/plugin-fs'
 import { isTextDoc } from './docKind'

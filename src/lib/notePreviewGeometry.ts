@@ -370,7 +370,7 @@ export const addPointerDragListeners = (
   }
 }
 
-export const hasStoredChildOffset = (note: Note | null | undefined): boolean => (
+export const hasStoredChildOffset = (note: Pick<BranchNote, 'previewLayout'> | null | undefined): boolean => (
   Math.abs(note?.previewLayout?.offsetX || 0) > 1 ||
   Math.abs(note?.previewLayout?.offsetY || 0) > 1
 )
@@ -441,4 +441,109 @@ export const areRectsEqual = (
     left.width === right.width &&
     left.height === right.height
   )
+}
+
+/** The fields of a note the branch layout reads. */
+export interface BranchNote {
+  id: string
+  color?: string | null
+  collapsedChildren?: boolean
+  previewSize?: NotePreviewSize
+  previewLayout?: { offsetX: number; offsetY: number }
+}
+
+export interface BranchEdge {
+  id: string
+  toNoteId: string
+  fromNoteId?: string
+  anchorPoint?: Point
+  color: string
+  fromColor?: string
+  depth: number
+}
+
+/**
+ * Where every card of an open note's branch goes, and the strings between them. The
+ * root sits beside its anchor; each child is an offset from its parent (stored on the
+ * note, overridden mid-drag, or the default fan), so moving a parent moves its subtree.
+ * Cards are kept in the window by the size they are drawn at (their text can grow
+ * them past their stored size), and out of `keepOut`. A collapsed note's children are
+ * left out. Edges come parent first.
+ */
+export const layoutNoteBranch = ({
+  anchorRect,
+  rootNote,
+  childMap,
+  cardSizes,
+  drawnSizes,
+  dragLayouts,
+  keepOut,
+  colorOf,
+}: {
+  anchorRect: AnchorRect
+  rootNote: BranchNote
+  childMap: Map<string, BranchNote[]>
+  cardSizes: Record<string, NotePreviewSize>
+  drawnSizes: Record<string, NotePreviewSize>
+  dragLayouts: Record<string, { offsetX: number; offsetY: number }>
+  keepOut: Box[]
+  colorOf: (color: string | null | undefined) => string
+}) => {
+  const rootBase = getInitialTilePosition(anchorRect)
+  const getNoteSize = (note: BranchNote): NotePreviewSize => cardSizes[note.id] || note.previewSize || {
+    width: TILE_WIDTH,
+    height: TILE_MIN_HEIGHT,
+  }
+  const boundsOf = (note: BranchNote): NotePreviewSize => drawnSizes[note.id] || getNoteSize(note)
+
+  const rootOffset = dragLayouts[rootNote.id] || rootNote.previewLayout || { offsetX: 0, offsetY: 0 }
+  const rootPosition = clampPosition({
+    x: rootBase.x + (rootOffset.offsetX || 0),
+    y: rootBase.y + (rootOffset.offsetY || 0),
+  }, boundsOf(rootNote), keepOut)
+
+  const positions = new Map<string, Point>()
+  const sizes = new Map<string, NotePreviewSize>()
+  const nodes: { note: BranchNote; position: Point; size: NotePreviewSize; depth: number; childCount: number }[] = []
+  const edges: BranchEdge[] = [{
+    id: `anchor:${rootNote.id}`,
+    anchorPoint: getDotPoint(anchorRect),
+    toNoteId: rootNote.id,
+    color: colorOf(rootNote.color),
+    depth: 0,
+  }]
+
+  const visit = (note: BranchNote, position: Point, depth = 0) => {
+    const size = getNoteSize(note)
+    positions.set(note.id, position)
+    sizes.set(note.id, size)
+    const children = childMap.get(note.id) || []
+    nodes.push({ note, position, size, depth, childCount: children.length })
+
+    if (note.collapsedChildren) return
+
+    children.forEach((child, index) => {
+      const fallbackOffset = getDefaultChildOffset(index, children.length)
+      const storedOffset = dragLayouts[child.id]
+        || (hasStoredChildOffset(child) && child.previewLayout ? child.previewLayout : fallbackOffset)
+      const childPosition = clampPosition({
+        x: position.x + (storedOffset.offsetX || 0),
+        y: position.y + (storedOffset.offsetY || 0),
+      }, boundsOf(child), keepOut)
+
+      edges.push({
+        id: `${note.id}:${child.id}`,
+        fromNoteId: note.id,
+        toNoteId: child.id,
+        color: colorOf(child.color || note.color),
+        fromColor: colorOf(note.color),
+        depth: depth + 1,
+      })
+
+      visit(child, childPosition, depth + 1)
+    })
+  }
+
+  visit(rootNote, rootPosition, 0)
+  return { nodes, edges, positions, sizes, rootBase, rootPosition }
 }
