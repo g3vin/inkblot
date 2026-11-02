@@ -16,10 +16,15 @@ import { createRoot } from 'react-dom/client'
 import './styles/fonts.js'
 import './index.css'
 import App from './App.jsx'
+import CrashBoundary from './components/CrashBoundary.jsx'
+import { installDiagnostics } from './lib/diagnostics'
 import { getPreference, hydratePreferences } from './lib/preferences'
 import { setAccentAttribute, setThemeAttribute, setTrayAttribute } from './lib/theme'
 import { applyPlatformAttribute } from './ui/platform'
 import { placeTrafficLights } from './lib/trafficLights'
+
+// First, so a failure anywhere after this is recorded (lib/diagnostics).
+installDiagnostics()
 
 // Dev only: `?mock` runs the page against scripts/dev/tauri-mock.js so it opens in a
 // plain browser, and `?variant=<family>:<picks>` turns on a design-review prototype
@@ -47,6 +52,8 @@ const Root = showcase ? (await import('./dev/DesignShowcase.jsx')).default : App
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <Root />
+    <CrashBoundary>
+      <Root />
+    </CrashBoundary>
   </StrictMode>,
 )

@@ -23,6 +23,11 @@ export const FILETREE_SELECTION = 'filetree:selection'
 /** A document's version history changed. `{ projectName, docName }` */
 export const VERSIONS_CHANGED = 'versions:changed'
 
+/** Open Report a bug. No detail. */
+export const REPORT_BUG = 'inkblot:report-bug'
+/** Show the bug and crash reports folder. No detail. */
+export const SHOW_BUG_REPORTS = 'inkblot:show-bug-reports'
+
 /** Open the ⌘K palette. No detail. */
 export const COMMAND_PALETTE = 'inkblot:command-palette'
 /** Close the project and show them all. No detail. */

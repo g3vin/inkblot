@@ -117,6 +117,8 @@
  *          the Rust commands it prints for a set of changed files
  *   hooks  the Claude Code hooks: the writer's own documents kept out of every session,
  *          and commands that would flood one blocked
+ *   diagnostics bug and crash reports: no report carries a writer's words (the allowlist,
+ *          the console, the leak guard), bounded logs, and Report a bug… mounted
  *
  * The @tauri-apps modules are stubbed (stub-*.mjs) with an in-memory filesystem,
  * so the REAL FileSystem.js / assets.js run against them rather than a
@@ -135,7 +137,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'speech', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'inkwheel', 'icons', 'help', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks', 'keys', 'tables', 'presets', 'updates', 'windows', 'emptiness', 'reveal', 'landing', 'selection', 'focus', 'physics', 'toolwheel', 'affected', 'hooks']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'speech', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'inkwheel', 'icons', 'help', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks', 'keys', 'tables', 'presets', 'updates', 'windows', 'emptiness', 'reveal', 'landing', 'selection', 'focus', 'physics', 'toolwheel', 'affected', 'hooks', 'diagnostics']
 
 const args = process.argv.slice(2)
 const verbose = args.includes('--verbose') || process.env.TEST_VERBOSE === '1'

@@ -21,7 +21,7 @@ inkblot-core = { path = "../inkblot-core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 reqwest = { workspace = true }
-log = "0.4"
+log = { workspace = true }
 ndarray = "0.17.2"
 ort = { version = "2.0.0-rc.11", features = ["ndarray"] }
 # No `http`: the tokenizer is always read from a file, and the http feature is what

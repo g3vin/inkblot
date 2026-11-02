@@ -115,6 +115,15 @@ To do this, Inkblot uses the sign-in details or access tokens you provide for th
 
 ## Bug Reports and Update Notes
 
+**Bug and crash reports on your device.** When you choose Report a bug, or when the
+app crashes, Inkblot saves a report on your device, in its Logs folder
+(`~/Library/Logs/Inkblot` on a Mac). A report describes what the app was doing: your
+recent actions in the app, errors and logs, how fast it was running, the app version
+and operating system, and the structure of your open documents, such as how many
+paragraphs and words they have. It never includes the contents of your documents or
+notes; file, folder and project names are kept. These reports are not sent anywhere.
+You can open the folder, or delete every report, from Settings ▸ Bug reports.
+
 **Bug reports** are sent only when you choose to send one. A report includes:
 - what you write;
 - the app version and operating system;

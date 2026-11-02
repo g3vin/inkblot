@@ -6,6 +6,15 @@ Notable changes to Inkblot. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Report a bug:** Help ▸ Report a bug… (⌥⌘B) saves a snapshot of what Inkblot was
+  doing, with a note if you want to add one: your recent actions, any errors, how fast
+  it was running, and the shape of your open documents. Save a bug snapshot (⌥⇧⌘B)
+  skips the note. If Inkblot crashes, it saves a crash report on its own and mentions
+  it the next time it opens. Reports stay on your Mac, in your Logs folder, and never
+  include your writing. Settings ▸ Bug reports shows them in Finder or deletes them.
+
 ## [0.4.1] - 2026-10-24
 
 ### Changed

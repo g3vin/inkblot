@@ -15,10 +15,11 @@
 
 use std::path::PathBuf;
 
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, RunEvent};
 
 mod app_windows;
 mod core_commands;
+mod diagnostics_commands;
 mod dictation_commands;
 mod haptics_commands;
 mod pinterest_commands;
@@ -78,6 +79,7 @@ pub fn run() {
         .manage(RhymeState::default())
         .manage(ScrapeChannels::default())
         .setup(|app| {
+            diagnostics_commands::init(app.handle());
             trackpad::install(app.handle());
             let main = app_windows::build_main(app.handle())?;
             window_chrome::place_default(&main);
@@ -130,7 +132,23 @@ pub fn run() {
             stats_config,
             stats_set_config,
             project_word_counts,
+            diagnostics_commands::diagnostics_info,
+            diagnostics_commands::diagnostics_write_report,
+            diagnostics_commands::diagnostics_heartbeat,
+            diagnostics_commands::diagnostics_rust_log,
+            diagnostics_commands::diagnostics_page_started,
+            diagnostics_commands::diagnostics_expect_reload,
+            diagnostics_commands::diagnostics_take_notices,
+            diagnostics_commands::diagnostics_counts,
+            diagnostics_commands::diagnostics_delete_all,
+            diagnostics_commands::diagnostics_reveal,
+            diagnostics_commands::diagnostics_test_panic,
         ])
-        .run(tauri::generate_context!())
-        .expect("error running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error building tauri application")
+        .run(|_app, event| {
+            if let RunEvent::Exit = event {
+                diagnostics_commands::clean_exit();
+            }
+        });
 }

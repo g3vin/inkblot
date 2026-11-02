@@ -1,0 +1,46 @@
+/* Toast: a short status line at the foot of the window (Toast.jsx, docs/DESIGN.md §9). */
+
+.ib-toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-8);
+  z-index: var(--z-toast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: calc(100vw - 2 * var(--space-6));
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: var(--hairline) solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--surface-float);
+  box-shadow: var(--shadow-float);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  translate: -50% 0;
+  animation: ib-toast-in var(--spring-smooth-dur) var(--spring-smooth);
+}
+
+.ib-toast.is-leaving {
+  pointer-events: none;
+  animation: ib-toast-out var(--spring-exit-dur) var(--spring-exit) forwards;
+}
+
+.ib-toast-icon {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.ib-toast-message {
+  min-width: 0;
+}
+
+@keyframes ib-toast-in {
+  from { opacity: 0; transform: translateY(var(--space-3)); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes ib-toast-out {
+  to { opacity: 0; transform: translateY(var(--space-3)); }
+}

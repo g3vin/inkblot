@@ -19,6 +19,12 @@ typeshare = { workspace = true }
 regex = { workspace = true }
 fancy-regex = { workspace = true }
 once_cell = { workspace = true }
+# diagnostics: the Rust log behind bug and crash reports.
+log = { workspace = true }
+
+# diagnostics: getrusage for a report's memory and CPU time.
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
 
 [lints]
 workspace = true
