@@ -83,10 +83,18 @@ function subscribeCommands(listener: () => void): () => void {
   return () => listeners.delete(listener)
 }
 
+let observer: ((id: string) => void) | null = null
+
+/** Hear each command as it runs: bug reports' breadcrumbs. */
+export function observeCommands(listener: ((id: string) => void) | null): void {
+  observer = listener
+}
+
 /** Run a command by id. False, without running, when it is unknown or its `when` says no. */
 export async function runCommand(id: string): Promise<boolean> {
   const command = registry.get(id)
   if (!command || command.when?.() === false) return false
+  observer?.(id)
   await command.run()
   return true
 }

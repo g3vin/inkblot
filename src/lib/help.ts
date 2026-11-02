@@ -88,6 +88,17 @@ export const HELP_TOPICS: HelpTopic[] = [
       'Every tool keeps its place, so after a while your hand knows the way. Rest on Highlight to choose its colour.',
     ],
   },
+  {
+    id: 'diagnostics.reports',
+    section: 'Settings',
+    title: 'Bug reports',
+    body: [
+      'When something goes wrong, choose Help ▸ Report a bug… (⌥⌘B). Inkblot saves a snapshot of what it was doing: your recent actions, any errors, how fast it was running, and the shape of the documents you have open, such as how many paragraphs and words they have. Save a bug snapshot (⌥⇧⌘B) does the same without asking for a note.',
+      'If Inkblot crashes, it saves a crash report on its own and tells you the next time it opens.',
+      'Reports never include your writing. File and project names are kept; the words in them are not, and anything that matches your open documents is taken out before a report is saved.',
+      'Reports stay on this Mac, in your Logs folder. Nothing is sent anywhere. To share one, attach the file to a message yourself.',
+    ],
+  },
 
   // ---------- Stats ----------
   {

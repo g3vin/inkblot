@@ -1,0 +1,10 @@
+/* CrashBoundary: the fallback that fills the window when the page fails to render. */
+.crash-boundary {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--app-bg);
+  color: var(--text-primary);
+}

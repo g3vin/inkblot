@@ -29,7 +29,9 @@ import { getStatsRuntime, useStatsRuntime } from './stats/useStats.js'
 import { OPEN_SETTINGS, primaryTimerAction } from './stats/timerMenu.js'
 import { allRoutines } from './stats/config.js'
 import { buildFormatMenu, buildInsertMenu, fileExtraItems, pasteAndMatchStyleItem, viewItems } from './menus/appMenus.js'
-import { CLOSE_PROJECT, COMMAND_PALETTE, EXPORT_EVENT, IMPORT_SCRIPT, PAGE_SETUP, PRINT_EVENT, PRINT_LAYOUT_TOGGLE, WRITING_FORMAT } from './lib/appEvents'
+import { CLOSE_PROJECT, COMMAND_PALETTE, EXPORT_EVENT, IMPORT_SCRIPT, PAGE_SETUP, PRINT_EVENT, PRINT_LAYOUT_TOGGLE, REPORT_BUG, SHOW_BUG_REPORTS, WRITING_FORMAT } from './lib/appEvents'
+import BugReporter from './components/BugReporter.jsx'
+import { Toaster } from './ui'
 
 const THEME_STORAGE_KEY = 'inkblot-theme'
 const ACCENT_STORAGE_KEY = 'inkblot-accent-color'
@@ -335,6 +337,10 @@ export default function App() {
       const extras = await fileExtraItems(api)
       if (fileSubmenu) await fileSubmenu.insert(extras, 0)
       await named('Edit')?.append([await PredefinedMenuItem.new({ item: 'Separator' }), await pasteAndMatchStyleItem(api)])
+      await named('Help')?.append([
+        await MenuItem.new({ id: 'report-bug', text: 'Report a bug…  ⌥⌘B', action: () => dispatchAppEvent(REPORT_BUG) }),
+        await MenuItem.new({ id: 'show-bug-reports', text: 'Show bug reports in Finder', action: () => dispatchAppEvent(SHOW_BUG_REPORTS) }),
+      ])
       // Insert, Format and Timer before Window, where a Mac app has them.
       const added = [await buildInsertMenu(api), await buildFormatMenu(api), await buildTimerMenu(api)]
       const windowAt = submenus.findIndex(([text]) => text === 'Window')
@@ -435,6 +441,8 @@ export default function App() {
       <TimerCapsule />
       <CommandPalette />
       <UpdateBanner />
+      <BugReporter />
+      <Toaster />
     </>
   )
 }

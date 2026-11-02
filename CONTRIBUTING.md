@@ -130,6 +130,15 @@ Most features touch the same layers in the same order. Skip the ones yours doesn
 - **Mirror both sides.** A function that exists in both JavaScript and Rust gets a
   parity case in `tests/parity/cases/`.
 
+## Logging
+
+**Never log a writer's words**: no document text, note, selection, clipboard or file
+contents, in JavaScript or Rust. Log ids, names, counts and errors. The console and the
+Rust log both end up in bug reports (ARCHITECTURE.md → Diagnostics). Reports guard
+against a slip, but the guard is the last line, not the rule. In Rust, use the `log`
+macros with an `inkblot` target; only `inkblot*` and `tauri` records at `info` and
+above are kept.
+
 ## Comments
 
 **A comment explains why, not what or when.** The code says what it does, and git says

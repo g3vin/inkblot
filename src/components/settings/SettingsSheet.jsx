@@ -19,6 +19,7 @@ import ShortcutsPane from './ShortcutsPane.jsx'
 import StoryPane from './StoryPane.jsx'
 import MapsPane from './MapsPane.jsx'
 import SelectionWheelPane from './SelectionWheelPane.jsx'
+import DiagnosticsPane from './DiagnosticsPane.jsx'
 import './Settings.css'
 
 const PANES = [
@@ -31,6 +32,7 @@ const PANES = [
   { id: 'story', title: 'Story', icon: 'calendar' },
   { id: 'maps', title: 'Maps', icon: 'map' },
   { id: 'shortcuts', title: 'Shortcuts', icon: 'keyboard' },
+  { id: 'bug-reports', title: 'Bug reports', icon: 'bug' },
 ]
 
 const THEMES = [{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }, { value: 'midnight', label: 'Midnight' }, { value: 'system', label: 'System' }]
@@ -92,6 +94,7 @@ export default function SettingsSheet({ appearance }) {
       {pane === 'reminders' ? <RemindersPane stats={stats} /> : null}
       {pane === 'shortcuts' ? <ShortcutsPane /> : null}
       {pane === 'maps' ? <MapsPane /> : null}
+      {pane === 'bug-reports' ? <DiagnosticsPane /> : null}
       {pane === 'story' ? <StoryPane projectName={askedProject || stats.tracker?.project || null} /> : null}
     </NavSheet>
   )

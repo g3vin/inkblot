@@ -335,6 +335,47 @@ one renderer for the surface, thumbnails and export). Suites: `maplib`, `maptrac
   its inspector, a `MapPanel` form drawn by `MapPanelView`, in the page. The logic is JS
   only; port it with parity cases when Rust first needs it.
 
+## Diagnostics
+
+Bug reports and crash reports, saved on the writer's computer and never sent anywhere.
+**A report never contains a writer's words.** File, folder and project names are kept.
+
+- **Where:** `~/Library/Logs/Inkblot` on macOS (Tauri's log directory elsewhere), apart
+  from app data and named without the bundle id so the private-writing hook still lets
+  it be read. `reports/` holds Report a bug…, `crashes/` the rest, `inkblot.log` the
+  Rust log, and `session.json` exists while the app runs. Each folder keeps its newest
+  100 files for 60 days.
+- **The page** (`src/lib/diagnostics/`) records from before React mounts (`main.jsx`):
+  - a trail of breadcrumbs: commands (`observeCommands` in `commands.ts`), bridge
+    events and the commands the chrome sends (`onShellPost` in `appBridge.ts`), clicks,
+    shortcuts, dialogs, focus;
+  - the console, uncaught errors and rejections;
+  - event-loop lag and input latency.
+
+  Each is a bounded ring. A report adds the allowlisted bridge state and preferences,
+  the open documents' shape (node counts, sizes, selection, undo depth) and the native
+  side's log and memory use. Every 15 seconds the trail is sent to the native side, so
+  a crash can say what came before it.
+- **The native side** (`inkblot_core::diagnostics`, `diagnostics_commands.rs`) owns the
+  folder, the `log` backend, the panic hook and `session.json`. A session file still
+  there at launch means the last run never exited cleanly: it becomes an
+  `unclean-exit` report with the last trail. A second page start in one process means
+  the web content process died: a `page-reload` report. Neither is tracked in debug
+  builds (`INKBLOT_DIAGNOSTICS_SESSIONS=1` turns them on). Crash reports from the last
+  run are mentioned once at launch (`BugReporter.jsx`).
+- **Why no writing gets in** (`sanitize.ts`, tested in `tests/unit/diagnostics.mjs`):
+  1. Payloads go through `summarize`. It keeps numbers, booleans and structure, and keeps a
+     string only under a key in `SAFE_KEYS` (ids, modes, names, paths). Every other
+     string becomes its length, so a new field is redacted until its key is added on
+     purpose.
+  2. Console arguments after the first are reduced the same way.
+  3. The leak guard runs last, over the finished report and the writer's note. It
+     removes any string sharing a run of four words with an open document, and
+     compares in memory only.
+
+  The trail written to `session.json` is summarized as it is recorded and carries
+  error names, not messages.
+
 ## JavaScript and Rust parity
 
 Several domain modules exist twice:

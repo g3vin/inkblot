@@ -15,7 +15,7 @@ import {
   FloatingCapsule, FloatingToolbar, FormRow, Icon, IconButton, Inlay, InlaySlot, InkPicker, InkWheel, ToolWheel, ToolWheelPreview, Input, Kbd, Menu, MenuItem,
   MenuLabel, MenuSeparator, MoreMenu, Panel, PanelActions, PanelBody, PanelHeader, PaperPile, PaperSheet, Popover, ScopeMenu, Section, Segmented, popUpMenu,
   SelectMenu, Skeleton, SkeletonOverlay, SkeletonRows, Stepper, Tabs, Tag, TextArea, Toggle, ToolbarSeparator,
-  staggerStyle, useReveal,
+  staggerStyle, useReveal, Toaster, showToast,
 } from '../ui'
 import NavSheet from '../ui/NavSheet.jsx'
 import { ToolbarDockContext } from '../ui/layer'
@@ -399,6 +399,7 @@ export default function DesignShowcase() {
             ])}>A button’s menu <Icon name="chevron-down" /></Button>
             <Button variant="tinted" onClick={() => setDialog(true)}>Open a small decision</Button>
             <Button variant="tinted" onClick={() => setSheet(true)}>Open a medium dialog</Button>
+            <Button variant="tinted" onClick={() => showToast({ icon: 'bug', message: 'Bug report saved', action: { label: 'Show in Finder', run: () => {} } })}>Show a toast</Button>
           </div>
         </ShowcaseSection>
 
@@ -669,6 +670,7 @@ export default function DesignShowcase() {
         </NavSheet>
       ) : null}
       <CommandPalette />
+      <Toaster />
     </div>
   )
 }
