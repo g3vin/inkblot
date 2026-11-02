@@ -1,3 +1,4 @@
+/* Tooltip.css — the Tooltip primitive's bubble (.ib-tooltip). */
 .ib-tooltip {
   z-index: var(--z-tooltip);
   display: inline-flex;
@@ -13,7 +14,7 @@
   font-weight: var(--weight-medium);
   line-height: var(--leading-tight);
   pointer-events: none;
-  animation: ib-tooltip-in var(--dur-fast) var(--ease-out);
+  animation: ib-tooltip-in var(--spring-quick-dur) var(--spring-quick);
 }
 
 .ib-tooltip .ib-kbd {

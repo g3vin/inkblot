@@ -28,7 +28,7 @@
   --text-muted: color-mix(in srgb, var(--text-primary) var(--tray-text-muted-mix), var(--tray-sheet));
   --text-subtle: color-mix(in srgb, var(--text-primary) var(--tray-text-subtle-mix), var(--tray-sheet));
   outline: none;
-  animation: ui-fade-in var(--dur-fast) var(--ease-standard);
+  animation: ui-fade-in var(--spring-quick-dur) var(--spring-quick);
   user-select: none;
   -webkit-user-select: none;
 }
@@ -57,7 +57,7 @@
   align-items: center;
   gap: var(--space-3);
   white-space: nowrap;
-  animation: ui-fade-in var(--dur-fast) var(--ease-standard);
+  animation: ui-fade-in var(--spring-quick-dur) var(--spring-quick);
 }
 
 .bubble-editor-done { gap: var(--space-2); }
@@ -126,11 +126,10 @@
   cursor: grab;
   touch-action: none;
   white-space: nowrap;
-  transition:
-    opacity var(--dur-fast) ease,
-    border-color var(--dur-fast) ease,
-    background var(--dur-fast) ease,
-    scale var(--dur-base) var(--ease-standard);
+  transition: opacity var(--spring-quick-dur) var(--spring-quick),
+    border-color var(--spring-quick-dur) var(--spring-quick),
+    background var(--spring-quick-dur) var(--spring-quick),
+    scale var(--spring-smooth-dur) var(--spring-smooth);
 }
 
 .bubble:hover { border-color: var(--border-strong); }
@@ -154,7 +153,7 @@
 .bubble.is-join-target.joins-before { box-shadow: inset 4px 0 0 -1px var(--accent-color), var(--shadow-1); }
 .bubble.is-join-target.joins-after { box-shadow: inset -4px 0 0 -1px var(--accent-color), var(--shadow-1); }
 
-.bubble.is-dropped { animation: bubble-pop var(--dur-base) var(--ease-standard); }
+.bubble.is-dropped { animation: bubble-pop var(--spring-smooth-dur) var(--spring-smooth); }
 @keyframes bubble-pop { from { transform: scale(0.82); } to { transform: scale(1); } }
 
 .bubble.is-aside {
@@ -181,7 +180,7 @@
   cursor: grabbing;
   transform: scale(1.06);
   box-shadow: var(--shadow-2);
-  transition: transform 120ms ease, opacity 120ms ease;
+  transition: transform var(--spring-quick-dur) var(--spring-quick), opacity var(--spring-quick-dur) var(--spring-quick);
 }
 
 .bubble.is-floating.is-trashing {
@@ -251,7 +250,7 @@
   pointer-events: none;
   opacity: 0;
   box-shadow: inset 0 3px 0 var(--accent-color), inset 0 48px 48px -32px var(--accent-glow);
-  transition: opacity var(--dur-fast) ease;
+  transition: opacity var(--spring-quick-dur) var(--spring-quick);
 }
 .bubble-editor.is-aside-armed .bubble-editor-shelf { opacity: 1; }
 
@@ -279,7 +278,7 @@
   opacity: 0;
   transform: translateY(16px) scale(0.9);
   pointer-events: none;
-  transition: opacity var(--dur-fast) ease, transform var(--dur-fast) var(--ease-standard), color 120ms ease, background 120ms ease;
+  transition: opacity var(--spring-quick-dur) var(--spring-quick), transform var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick), background var(--spring-quick-dur) var(--spring-quick);
 }
 .bubble-trash.is-visible { opacity: 1; transform: none; }
 .bubble-trash.is-armed {
@@ -302,7 +301,7 @@
   gap: var(--space-3);
   padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
   white-space: nowrap;
-  animation: ui-fade-in var(--dur-fast) var(--ease-standard);
+  animation: ui-fade-in var(--spring-quick-dur) var(--spring-quick);
 }
 .bubble-forms:not(:has(.bubble-forms-dots)) { padding-left: var(--space-1); }
 
@@ -317,7 +316,7 @@
   border-radius: var(--radius-pill);
   background: var(--text-muted);
   cursor: pointer;
-  transition: width var(--dur-fast) var(--ease-standard), background var(--dur-fast) ease;
+  transition: width var(--spring-quick-dur) var(--spring-quick), background var(--spring-quick-dur) var(--spring-quick);
 }
 .bubble-forms-dot.is-unsaved { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-secondary); }
 .bubble-forms-dot.is-current { width: 20px; background: var(--accent-color); box-shadow: none; }
@@ -381,7 +380,7 @@
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  transition: transform 140ms ease, background 140ms ease;
+  transition: transform var(--spring-quick-dur) var(--spring-quick), background var(--spring-quick-dur) var(--spring-quick);
 }
 
 /* The 2px it keeps after itself, hung in the margin (lib/marginHang.js). */
@@ -408,7 +407,7 @@
   width: 4px;
   height: 4px;
   opacity: 0.55;
-  transition: width 180ms ease, opacity 180ms ease;
+  transition: width var(--spring-smooth-dur) var(--spring-smooth), opacity var(--spring-smooth-dur) var(--spring-smooth);
 }
 
 .bubble-session-chip.has-forms .bubble-session-chip-dot.is-unsaved {
@@ -445,7 +444,7 @@
 /* And once it has turned, the new form flashes and fades. */
 .bubble-session.is-form-changed {
   border-radius: var(--radius-sm);
-  animation: bubble-form-changed 700ms ease-out;
+  animation: bubble-form-changed var(--spring-gentle-dur) var(--spring-gentle);
 }
 
 @keyframes bubble-form-changed {

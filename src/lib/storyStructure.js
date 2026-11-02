@@ -7,6 +7,8 @@
  * (folderPresets.ts: a name, an icon and an ink), so every lookup here takes the list
  * to match against; left out, it is the built-ins alone, which is what the Rust twin
  * (`story_structure.rs`) mirrors.
+ *
+ * Mirrors: `src-tauri/crates/inkblot-core/src/story_structure.rs`; `npm run parity` asserts they agree.
  */
 import { getDocDisplayName } from './docKind'
 

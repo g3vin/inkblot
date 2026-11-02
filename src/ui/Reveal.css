@@ -6,11 +6,11 @@
 
 [data-reveal='hidden'] {
   opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out);
+  transition: opacity var(--spring-quick-dur) var(--spring-quick);
 }
 
 [data-reveal='shown'] {
-  animation: ib-reveal-in var(--dur-reveal) var(--ease-out) both;
+  animation: ib-reveal-in var(--spring-smooth-dur) var(--spring-smooth) both;
 }
 
 @keyframes ib-reveal-in {
@@ -23,7 +23,7 @@
 /* The same entrance under a second name, so a value that changes twice runs it twice
    (useRevealOnChange). */
 [data-reveal='shown-again'] {
-  animation: ib-reveal-in-again var(--dur-reveal) var(--ease-out) both;
+  animation: ib-reveal-in-again var(--spring-smooth-dur) var(--spring-smooth) both;
 }
 
 @keyframes ib-reveal-in-again {
@@ -46,7 +46,7 @@
 }
 
 .ib-stagger[data-reveal='shown'] > * {
-  animation: ib-reveal-in var(--dur-reveal) var(--ease-out) both;
+  animation: ib-reveal-in var(--spring-smooth-dur) var(--spring-smooth) both;
   animation-delay: calc(var(--reveal-index, 0) * var(--reveal-stagger));
 }
 
@@ -55,7 +55,7 @@
 /* Anything holding skeletons: hidden until its load has been slow for REVEAL.delay. */
 .ib-skeleton-host {
   opacity: 0;
-  transition: opacity var(--dur-reveal) var(--ease-out);
+  transition: opacity var(--spring-smooth-dur) var(--spring-smooth);
 }
 
 .ib-skeleton-host[data-visible='true'] {

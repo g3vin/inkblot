@@ -139,3 +139,17 @@ export const placeRing = (anchor, extent, viewport, margin = 8) => {
     y: clamp(anchor.y, extent.top + margin, viewport.height - extent.bottom - margin),
   }
 }
+
+/*
+ * The tool wheel (ToolWheel.jsx) reuses the ring's arithmetic with larger places: an
+ * icon needs a disc, and a flick toward a tool needs more slack than a drag on a dot.
+ */
+
+/** A tool's disc, and how far from its centre a click still lands on it. */
+export const TOOL_DISC = 40
+export const TOOL_HIT = 26
+/** Hand travel before a direction means a tool: a resting mouse drifts a few pixels. */
+export const TOOL_DEAD_ZONE = 16
+
+/** The tool ring's radius: wider past six tools so the discs never touch. */
+export const toolRingRadius = (count) => (count > 6 ? 76 : 64)

@@ -16,10 +16,17 @@ import { PROJECT_FILES_CHANGED } from '../lib/projectFiles'
 import { readDetachedTarget } from '../lib/docWindow'
 import { normalizeNotes } from '../lib/noteUtils'
 import { RevealGate } from '../ui/Reveal.jsx'
+import { useRevealGateOpen } from '../ui/revealState.js'
+import { REVEAL } from '../ui/motion.js'
 
 import './Editor.css'
 
 import ProjectLanding from './ProjectLanding'
+import SheetFlight from './landing/SheetFlight'
+import { observeExcerptPaths } from '../lib/docExcerpts'
+import { remapRecents } from '../lib/recentDocs'
+import { cancelSummaryRefresh, scheduleSummaryRefresh } from '../lib/projectSummaries'
+import { PROJECT_DELETED, PROJECT_RENAMED } from '../lib/projectLifecycle'
 import { useTabs } from '../hooks/useTabs'
 import { useTabsPublisher } from '../hooks/useTabsPublisher'
 import { useEntryOperations } from '../hooks/useEntryOperations'
@@ -30,13 +37,16 @@ import {
   loadClipboardHistory,
   loadSession,
   normalizeProjectSession,
+  openAloneIn,
 } from '../lib/editorSession'
 import { setPreference, setSessionValue } from '../lib/preferences'
 import { setOpenProject, clearOpenProject } from '../lib/projectContext'
 import { dragHandoff, documentSurface, DragPayloadKind, editorRegistry } from '../bridge'
 import { getProjectRoot } from '../lib/projectPaths'
+import { useCommands } from '../lib/commands'
 import { useWindowPop } from '../hooks/useWindowPop'
 import DetachedWindowBar from './DetachedWindowBar'
+import { CLOSE_PROJECT, EDITOR_DRAGEND_DROP_TO_CLIPBOARD, EDITOR_SELECTION_DRAGEND, FILETREE_SHOW_PROJECTS, PROJECT_OPENED } from '../lib/appEvents'
 
 /**
  * What opening a project waits for before any of it is shown (ui/Reveal.jsx): the file
@@ -45,8 +55,19 @@ import DetachedWindowBar from './DetachedWindowBar'
  * vanishes after it is drawn.
  */
 const REVEAL_PIECES = ['tree', 'primary', 'secondary', 'locks', 'session']
+/** Opened from a sheet on the landing page, it also waits for the sheet to land (SheetFlight). */
+const REVEAL_PIECES_ARRIVING = [...REVEAL_PIECES, 'arrival']
 const SESSION_CHECKED = ['session']
+const SESSION_AND_ARRIVAL = ['session', 'arrival']
+const ARRIVAL_ONLY = ['arrival']
 const NOTHING_CHECKED = []
+
+/** Tells Editor when the RevealGate it is inside opens, for the flight waiting on it. */
+function ReportGateOpen({ onOpen }) {
+  const open = useRevealGateOpen()
+  useEffect(() => { if (open) onOpen() }, [onOpen, open])
+  return null
+}
 
 /** Return a TipTap editor's live ProseMirror view, or null if unmounted/destroyed. */
 const getMountedEditorView = (instance) => {
@@ -103,6 +124,10 @@ export default function Editor({
   // a tab that has not decided what document it is yet (see DraftTabPane).
   const [tabs, setTabs] = useState([])
   const [activeTabId, setActiveTabId] = useState(null)
+  // A sheet from the landing page on its way to becoming the document card: its box,
+  // turn and words, the project and document it opens, whether it has landed, and
+  // whether the document under it is ready (SheetFlight).
+  const [arrival, setArrival] = useState(null)
   const refreshFilesRef = useRef(null)
   const draggedSelectionRef = useRef(null)
   // A document written outside the tree (lib/projectFiles.js) appears in it.
@@ -113,8 +138,9 @@ export default function Editor({
   }, [])
 
   // Switch to a project (or back to the landing page when passed a falsy name),
-  // restoring that project's persisted docs/tiles/sidebar state.
-  const openProject = useCallback((nextProjectName) => {
+  // restoring that project's persisted docs/tiles/sidebar state. `docPath` opens it at
+  // that document instead (a sheet chosen from its pile), as the file tree would.
+  const openProject = useCallback((nextProjectName, { docPath = '' } = {}) => {
     if (!nextProjectName) {
       setProjectNameState('')
       setCurrentDoc('')
@@ -132,6 +158,7 @@ export default function Editor({
       setTiles([])
       setNotesByDoc({})
       setVersionsState({})
+      setArrival(null)
       // Nothing is open, so nothing should still answer for "the current project";
       // otherwise a Pinterest board mounting on the landing screen would keep the
       // last project's cache key.
@@ -139,33 +166,45 @@ export default function Editor({
       return
     }
 
+    // The project's own loads come before the landing page's counting.
+    cancelSummaryRefresh()
     const projectOpenId = `${nextProjectName}:${Date.now()}:${Math.random().toString(16).slice(2)}`
     try {
       // Ambient rather than React state: the Pinterest node views that read it have
       // no React path to reach. See lib/projectContext.
       setOpenProject(projectOpenId)
       setSessionValue('inkblot:project-open-id', projectOpenId)
-      window.dispatchEvent(new CustomEvent('inkblot:project-opened', {
+      window.dispatchEvent(new CustomEvent(PROJECT_OPENED, {
         detail: { projectName: nextProjectName, projectOpenId },
       }))
     } catch {
       // Session markers are best-effort; project opening should never depend on them.
     }
 
-    const projectSession = normalizeProjectSession(projectSessions[nextProjectName] || {})
+    const saved = normalizeProjectSession(projectSessions[nextProjectName] || {})
+    const workspace = {
+      tabs: saved.docTabs,
+      activeTabId: saved.activeTabId,
+      currentDoc: saved.currentDoc,
+      secondaryDoc: saved.secondaryDoc,
+      activeDoc: saved.activeDoc || saved.currentDoc,
+      splitView: saved.splitView,
+      splitOrientation: saved.splitOrientation,
+    }
+    const shown = docPath && docPath !== saved.currentDoc ? openAloneIn(workspace, docPath) : workspace
     setProjectNameState(nextProjectName)
-    setCurrentDoc(projectSession.currentDoc)
-    setActiveDoc(projectSession.activeDoc || projectSession.currentDoc)
-    setSecondaryDoc(projectSession.secondaryDoc)
-    setSplitView(projectSession.splitView)
-    setSplitOrientation(projectSession.splitOrientation)
-    setSplitRatioState(projectSession.splitRatio)
-    setTabs(projectSession.docTabs)
-    setActiveTabId(projectSession.activeTabId)
-    setSplits(projectSession.splits)
-    setActiveSplitId(projectSession.activeSplitId)
-    setSidebarTab(projectSession.sidebarTab)
-    setTiles(projectSession.tiles)
+    setCurrentDoc(shown.currentDoc)
+    setActiveDoc(shown.activeDoc || shown.currentDoc)
+    setSecondaryDoc(shown.secondaryDoc)
+    setSplitView(shown.splitView)
+    setSplitOrientation(shown.splitOrientation)
+    setSplitRatioState(saved.splitRatio)
+    setTabs(shown.tabs)
+    setActiveTabId(shown.activeTabId)
+    setSplits(saved.splits)
+    setActiveSplitId(saved.activeSplitId)
+    setSidebarTab(saved.sidebarTab)
+    setTiles(saved.tiles)
     setNotesByDoc({})
     setVersionsState({})
   }, [projectSessions])
@@ -315,6 +354,19 @@ export default function Editor({
     openProject(nextProjectName)
   }), [openProject])
 
+  // Back to the start screen: File ▸ All projects and the palette both land here. A
+  // detached window has no start screen to go back to.
+  const closeProject = useCallback(() => {
+    if (!detachedTarget) openProject('')
+  }, [detachedTarget, openProject])
+  useEffect(() => {
+    window.addEventListener(CLOSE_PROJECT, closeProject)
+    return () => window.removeEventListener(CLOSE_PROJECT, closeProject)
+  }, [closeProject])
+  useCommands(() => (projectName && !detachedTarget ? [
+    { id: 'project.close', section: 'App', title: 'Go to all projects', icon: 'grid', keys: 'Mod+Shift+O', keywords: ['close project', 'switch project', 'open project', 'start screen', 'home'], run: closeProject },
+  ] : []), [projectName, detachedTarget, closeProject])
+
   const docRef = useRef(currentDoc)
   useEffect(() => { docRef.current = currentDoc }, [currentDoc])
 
@@ -330,7 +382,7 @@ export default function Editor({
   const endLanding = useCallback(() => setLandingLeaving(false), [])
   useEffect(() => {
     if (!landingLeaving) return undefined
-    const timer = window.setTimeout(endLanding, 1000)
+    const timer = window.setTimeout(endLanding, Math.max(1000, REVEAL.arrive + 600))
     return () => window.clearTimeout(timer)
   }, [endLanding, landingLeaving])
 
@@ -360,7 +412,7 @@ export default function Editor({
         setSecondaryDoc(null)
         setSplitView(null)
         setNotesByDoc({})
-        window.dispatchEvent(new CustomEvent('filetree:show-projects'))
+        window.dispatchEvent(new CustomEvent(FILETREE_SHOW_PROJECTS))
         return
       }
 
@@ -399,6 +451,47 @@ export default function Editor({
     // Boot-once: re-running this would yank the window back to its opening document.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // A project renamed or deleted (lib/projectLifecycle.js) takes its session with it.
+  // The open project keeps its place under its new name rather than reopening, which
+  // would restore it from a session it no longer has.
+  const projectNameRef = useRef(projectName)
+  useEffect(() => { projectNameRef.current = projectName }, [projectName])
+  useEffect(() => {
+    const renamed = ({ detail: { from, to } }) => {
+      setProjectSessions((prev) => {
+        if (!prev[from]) return prev
+        const { [from]: session, ...rest } = prev
+        return { ...rest, [to]: session }
+      })
+      if (projectNameRef.current === from) setProjectNameState(to)
+    }
+    const deleted = ({ detail: { name } }) => {
+      setProjectSessions((prev) => {
+        if (!prev[name]) return prev
+        const { [name]: _dropped, ...rest } = prev
+        return rest
+      })
+      if (projectNameRef.current === name) openProject('')
+    }
+    window.addEventListener(PROJECT_RENAMED, renamed)
+    window.addEventListener(PROJECT_DELETED, deleted)
+    return () => {
+      window.removeEventListener(PROJECT_RENAMED, renamed)
+      window.removeEventListener(PROJECT_DELETED, deleted)
+    }
+  }, [openProject])
+
+  // Leaving a project, count its files and words again for the landing page.
+  const leftProjectRef = useRef(projectName)
+  useEffect(() => {
+    const left = leftProjectRef.current
+    leftProjectRef.current = projectName
+    if (left && left !== projectName && !detachedTarget) scheduleSummaryRefresh([left], { staleAfter: 0 })
+  }, [detachedTarget, projectName])
+
+  // Excerpts and the recent list follow documents renamed or moved in the tree.
+  useEffect(() => observeExcerptPaths(remapRecents), [])
 
   // Persist the session while on the landing page (covers project deletes/renames).
   useEffect(() => {
@@ -485,9 +578,9 @@ export default function Editor({
       })
     }
 
-    window.addEventListener('inkblot:editor-dragend-drop-to-clipboard', onEditorDragEndDropToClipboard)
+    window.addEventListener(EDITOR_DRAGEND_DROP_TO_CLIPBOARD, onEditorDragEndDropToClipboard)
     return () => {
-      window.removeEventListener('inkblot:editor-dragend-drop-to-clipboard', onEditorDragEndDropToClipboard)
+      window.removeEventListener(EDITOR_DRAGEND_DROP_TO_CLIPBOARD, onEditorDragEndDropToClipboard)
     }
   }, [handleDropToClipboard])
 
@@ -580,7 +673,7 @@ export default function Editor({
       }
 
       try {
-        window.dispatchEvent(new CustomEvent('inkblot:editor-selection-dragend', {
+        window.dispatchEvent(new CustomEvent(EDITOR_SELECTION_DRAGEND, {
           detail: {
             selection: draggedSelection,
             x: point.x,
@@ -603,7 +696,7 @@ export default function Editor({
 
       if (endedOverClipboard && dragHandoff.claim()) {
         try {
-          window.dispatchEvent(new CustomEvent('inkblot:editor-dragend-drop-to-clipboard', {
+          window.dispatchEvent(new CustomEvent(EDITOR_DRAGEND_DROP_TO_CLIPBOARD, {
             detail: {
               text: draggedSelection.text,
               selection: draggedSelection,
@@ -734,24 +827,68 @@ export default function Editor({
     return () => window.removeEventListener('keydown', handlePastePlain, { capture: true })
   }, [activeEditor, editor, secondaryEditor])
 
+  const documentCardRef = useRef(null)
+  // A sheet taking off opens its project only once it is in the air (SheetFlight's
+  // onLaunched): mounting the editor would otherwise hold its first frames back.
+  const openFromLanding = useCallback((nextProjectName, { docPath, flight } = {}) => {
+    if (!flight) {
+      setArrival(null)
+      openProject(nextProjectName, { docPath })
+      return
+    }
+    setArrival({ key: `${nextProjectName}:${Date.now()}`, ...flight, project: nextProjectName, docPath, landed: false, gateOpen: false })
+  }, [openProject])
+  const arrivalRef = useRef(arrival)
+  useEffect(() => { arrivalRef.current = arrival }, [arrival])
+  const launchArrival = useCallback(() => {
+    const launched = arrivalRef.current
+    if (launched) openProject(launched.project, { docPath: launched.docPath })
+  }, [openProject])
+  const landArrival = useCallback(() => setArrival((prev) => (prev ? { ...prev, landed: true } : prev)), [])
+  const arrivalGateOpened = useCallback(() => setArrival((prev) => (prev && !prev.gateOpen ? { ...prev, gateOpen: true } : prev)), [])
+  const endArrival = useCallback(() => setArrival(null), [])
+  const flight = arrival ? (
+    <SheetFlight
+      key={arrival.key}
+      arrival={arrival}
+      cardRef={documentCardRef}
+      gateOpen={arrival.gateOpen}
+      onLaunched={launchArrival}
+      onLanded={landArrival}
+      onDone={endArrival}
+    />
+  ) : null
+
   const landing = !projectName || landingLeaving ? (
     <ProjectLanding
       key="landing"
       projectSessions={projectSessions}
-      onOpenProject={openProject}
+      onOpenProject={openFromLanding}
       onCreateProject={createAndOpenProject}
       leaving={Boolean(projectName)}
+      flying={Boolean(arrival)}
       onLeft={endLanding}
     />
   ) : null
 
-  if (!projectName) return <>{landing}</>
+  // The flight comes first in both, so it is the same element across the hand-over.
+  if (!projectName) return <>{flight}{landing}</>
 
   return (
     <>
+    {flight}
     {landing}
-    <RevealGate keys={REVEAL_PIECES} resetKey={projectName} ready={validatedProject === projectName ? SESSION_CHECKED : NOTHING_CHECKED}>
+    <RevealGate
+      keys={arrival ? REVEAL_PIECES_ARRIVING : REVEAL_PIECES}
+      resetKey={projectName}
+      ready={validatedProject === projectName
+        ? (arrival?.landed ? SESSION_AND_ARRIVAL : SESSION_CHECKED)
+        : (arrival?.landed ? ARRIVAL_ONLY : NOTHING_CHECKED)}
+    >
+      {arrival ? <ReportGateOpen onOpen={arrivalGateOpened} /> : null}
       <EditorLayout
+        documentCardRef={documentCardRef}
+        arriving={arrival ? (arrival.landed ? 'landed' : 'flight') : undefined}
         splitView={splitView}
         setSplitView={setSplitView}
         splitOrientation={splitOrientation}

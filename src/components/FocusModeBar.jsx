@@ -4,10 +4,11 @@
  *
  * It never stays: it shows for a moment as focus mode opens, then only while the
  * pointer is at the card's top, a control in it has focus, or its text size popover is
- * open. The sidebar buttons sit in its corners, as on the card's toolbar.
+ * open, and never while focus mode is zooming in or out (`hidden`). The sidebar buttons
+ * sit in its corners, as on the card's toolbar.
  */
 import { useEffect, useRef, useState } from 'react'
-import { Button, FormRow, IconButton, Popover, Segmented, Stepper } from '../ui'
+import { FormRow, IconButton, Popover, Segmented, Stepper } from '../ui'
 import { FOCUS_MODE_LIMITS } from './focusModeSettings'
 
 /** How long the bar shows as focus mode opens, so the writer knows where it lives. */
@@ -20,7 +21,7 @@ const VIEWS = [
   { value: 'paragraph', label: 'Paragraph' },
 ]
 
-export default function FocusModeBar({ settings, onSetting, onExit, sidebars }) {
+export default function FocusModeBar({ settings, onSetting, onExit, sidebars, hidden = false }) {
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
   const [intro, setIntro] = useState(true)
@@ -28,10 +29,12 @@ export default function FocusModeBar({ settings, onSetting, onExit, sidebars }) 
   const hideTimer = useRef(null)
   const sizesRef = useRef(null)
 
+  // The intro counts from when the bar can first show, after the zoom in.
   useEffect(() => {
+    if (hidden) return undefined
     const timer = window.setTimeout(() => setIntro(false), INTRO_MS)
     return () => window.clearTimeout(timer)
-  }, [])
+  }, [hidden])
   useEffect(() => () => window.clearTimeout(hideTimer.current), [])
 
   const enter = () => {
@@ -43,7 +46,7 @@ export default function FocusModeBar({ settings, onSetting, onExit, sidebars }) 
     hideTimer.current = window.setTimeout(() => setHovered(false), HIDE_DELAY_MS)
   }
 
-  const shown = hovered || focused || intro || sizesOpen
+  const shown = !hidden && (hovered || focused || intro || sizesOpen)
   const paragraph = settings.paragraphContext
   const { left, right } = sidebars ?? {}
 
@@ -129,9 +132,22 @@ export default function FocusModeBar({ settings, onSetting, onExit, sidebars }) 
               />
             </FormRow>
           </Popover>
-          <Button className="focus-mode-bar-done" variant="tinted" size="toolbar" onClick={onExit} title="Leave focus mode (Esc)">
-            Done
-          </Button>
+          <IconButton
+            icon="number"
+            label={settings.showPosition ? 'Hide position' : 'Show position'}
+            title={settings.showPosition ? 'Hide paragraph and sentence numbers' : 'Show paragraph and sentence numbers'}
+            aria-pressed={settings.showPosition}
+            onClick={() => onSetting('showPosition', !settings.showPosition)}
+          />
+          <IconButton
+            className="focus-mode-bar-done"
+            icon="check"
+            label="Done"
+            title="Leave focus mode (Esc)"
+            variant="tinted"
+            size="circle"
+            onClick={onExit}
+          />
         </div>
 
         <div className="titlebar-toggle is-right">

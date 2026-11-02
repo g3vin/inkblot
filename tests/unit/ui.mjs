@@ -167,8 +167,8 @@ ok('a popover opened in a dialog renders in its layer', inner?.parentElement?.cl
 inner?.focus()
 await act(async () => inner.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
 ok('and Escape closes the popover, not the dialog', dialogClosed === 0 && !document.body.querySelector('.ib-popover:not(.is-leaving)'))
-// Opened from a toolbar's row, a Popover opens in the toolbar (DESIGN.md §6): a choice
-// in place beside its button, a form across the whole toolbar.
+// Opened from a toolbar's row, a Popover opens in the toolbar (DESIGN.md §6): in place
+// beside its button, with no heading, or across the whole toolbar when it asks to.
 const whole = document.createElement('div')
 const besideItem = document.createElement('div')
 document.body.append(whole, besideItem)
@@ -184,7 +184,7 @@ function InToolbar({ form }) {
   const [open, setOpen] = useState(false)
   return React.createElement(ToolbarDockContext.Provider, { value: toolbarDock },
     React.createElement('button', { ref, onClick: () => setOpen((was) => !was) }, 'Colour'),
-    React.createElement(Popover, { open, anchorRef: ref, onClose: () => setOpen(false), eyebrow: 'Card colour' },
+    React.createElement(Popover, { open, anchorRef: ref, onClose: () => setOpen(false), eyebrow: 'Card colour', dock: form ? 'whole' : undefined },
       form ? React.createElement('input', { 'aria-label': 'Voice' }) : React.createElement('button', null, 'Red')))
 }
 const colour = () => [...document.body.querySelectorAll('button')].find((b) => b.textContent === 'Colour')
@@ -192,14 +192,16 @@ await act(async () => root.render(React.createElement(InToolbar, { form: false }
 await act(async () => colour().dispatchEvent(new MouseEvent('click', { bubbles: true })))
 ok('a choice opens in place, beside its button', besideItem.querySelector('.ib-dock[data-mode="inline"]') !== null && !document.body.querySelector('.ib-popover:not(.is-leaving)'))
 ok('and its button stays pressed', colour().hasAttribute('data-opener'))
-await act(async () => pushedOut?.())
-ok('pushed out of the row, it takes the toolbar', whole.querySelector('.ib-dock[data-mode="whole"]') !== null && !besideItem.querySelector('.ib-dock'))
+ok('in the toolbar it carries no heading', !besideItem.querySelector('.ib-eyebrow') && besideItem.querySelector('.ib-dock')?.getAttribute('aria-label') === 'Card colour')
 await act(async () => colour().dispatchEvent(new MouseEvent('click', { bubbles: true })))
-ok('pressing its button again closes it', !whole.querySelector('.ib-dock') && !colour().hasAttribute('data-opener'))
+ok('pressing its button again closes it', !besideItem.querySelector('.ib-dock') && !colour().hasAttribute('data-opener'))
+await act(async () => colour().dispatchEvent(new MouseEvent('click', { bubbles: true })))
+await act(async () => pushedOut?.())
+ok('its page turned away, it closes', !besideItem.querySelector('.ib-dock') && !whole.querySelector('.ib-dock'))
 await act(async () => root.render(React.createElement(InToolbar, { form: true, key: 'form' })))
 await act(async () => colour().dispatchEvent(new MouseEvent('click', { bubbles: true })))
 const formDock = whole.querySelector('.ib-dock[data-mode="whole"]')
-ok('a form takes the whole toolbar, with a close button', formDock !== null && [...formDock.querySelectorAll('button')].some((b) => b.getAttribute('aria-label') === 'Close'))
+ok('asked to, it takes the whole toolbar, with a close button', formDock !== null && [...formDock.querySelectorAll('button')].some((b) => b.getAttribute('aria-label') === 'Close'))
 await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
 ok('and Escape puts it away', !whole.querySelector('.ib-dock'))
 whole.remove()

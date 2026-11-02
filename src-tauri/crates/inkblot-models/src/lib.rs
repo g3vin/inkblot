@@ -1,7 +1,7 @@
 //! inkblot-models — the on-device models, independent of any shell.
 //!
-//! Synonyms (an ONNX model), rhymes (a pronouncing-dictionary lookup), Kokoro speech
-//! (ONNX), whisper dictation, and the Pinterest scrape's return channel. Nothing here
+//! Synonyms (an ONNX model), rhymes (a pronouncing-dictionary lookup), Pocket TTS
+//! speech (ONNX), whisper dictation, and the Pinterest scrape's return channel. Nothing here
 //! knows about Tauri: an engine takes the directory to keep its files in, reports
 //! progress through a callback, and is owned by the caller. `src-tauri/src/*_commands.rs`
 //! wraps these for the page's `invoke`.
@@ -21,7 +21,7 @@ mod download;
 
 #[cfg(feature = "dictation")]
 pub mod dictation;
-pub mod kokoro_speech;
+pub mod pocket_speech;
 pub mod rhymes;
 pub mod scrape;
 pub mod synonyms;

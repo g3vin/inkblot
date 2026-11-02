@@ -13,6 +13,7 @@ import { useRef } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { inkColor } from '../lib/palette'
 import { useRovingFocus } from './hooks'
+import { SPRINGS, toFramer } from './physics.js'
 import Icon from './Icon'
 import './Surfaces.css'
 
@@ -34,7 +35,7 @@ export function Panel({ open = true, side = 'right', width = 300, label, classNa
           initial={reduce ? false : { opacity: 0, x: offset }}
           animate={{ opacity: 1, x: 0 }}
           exit={reduce ? { opacity: 0 } : { opacity: 0, x: offset }}
-          transition={{ duration: 0.18, ease: [0.2, 0.7, 0.2, 1] }}
+          transition={toFramer(SPRINGS.smooth)}
         >
           {children}
         </motion.aside>

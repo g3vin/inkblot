@@ -3,6 +3,7 @@
  * author's unit (inkblot.pageUnits), as LengthUnit.swift had it.
  */
 import { getPreference, setPreference } from '../../../lib/preferences'
+import { PAGE_UNITS } from '../../../lib/appEvents'
 
 export const UNITS_KEY = 'inkblot.pageUnits'
 
@@ -26,7 +27,7 @@ export const readUnit = () => {
 
 export const writeUnit = (unit) => {
   if (UNITS[unit]) setPreference(UNITS_KEY, unit)
-  window.dispatchEvent(new CustomEvent('inkblot:page-units'))
+  window.dispatchEvent(new CustomEvent(PAGE_UNITS))
 }
 
 export const fromMm = (mm, unit) => mm * UNITS[unit].perMm

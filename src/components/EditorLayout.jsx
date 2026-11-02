@@ -11,10 +11,11 @@
  * and search results, and the Bubble editor's sessions (EditorCanvas draws one in its
  * pane, and its bar takes over the toolbar).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { resolveAnchor } from '../bridge/anchors'
 import { documentSurface, shellBridge, useBridgeEvent, useBridgeState, useLatestBridgeState } from '../bridge'
 import { EditorTarget } from '../types'
+import { FILETREE_NEW_ENTRY, IMPORT_SCRIPT, PAGE_SETUP } from '../lib/appEvents'
 
 /** A stable identity, so useBridgeState's initial value is not a new object each render. */
 const EMPTY_ACTIVE_EDITOR = {}
@@ -46,6 +47,7 @@ import { CompareToolbarSlotContext } from './compareToolbarSlot'
 import { paragraphForBubble, selectionForBubble, useBubbleSessions } from '../hooks/useBubbleSessions'
 import { useReferences } from '../hooks/useReferences'
 import NoteHoverPreview from './NoteHoverPreview'
+import NotePanelTether from './NotePanelTether'
 import ToolbarHost from './toolbar/ToolbarHost'
 import IconButton from '../ui/IconButton'
 import { useReveal, useRevealReady } from '../ui/revealState.js'
@@ -60,6 +62,9 @@ import { refreshFolderPresets } from '../lib/folderPresets'
 import FolderPresetsSheet from './FolderPresetsSheet'
 import { refreshLocks, setDocumentLocked, setFolderLocked, useLockReason, useLocks } from '../lib/docLocks'
 import { currentTrafficLights, DEFAULT_TRAFFIC_LIGHTS, placeTrafficLights, TRAFFIC_LIGHT_DIAMETER, TRAFFIC_LIGHT_SPACING } from '../lib/trafficLights'
+import { rememberCardRect } from '../lib/landingCard'
+import { SPRINGS, springEasing } from '../ui/physics.js'
+import SelectionWheel from './SelectionWheel'
 
 // Room in the card's toolbar row for a corner's pin button.
 const CARD_TOGGLE_WIDTH = 44
@@ -83,8 +88,8 @@ const fullscreenButtonBox = () => {
 // the window top is above them.
 const WINDOW_DRAG_STRIP_HEIGHT = DEFAULT_TRAFFIC_LIGHTS.centerY * 2
 
-/** How long a hovering sidebar takes to slide in (--dur-slow): its lights wait for it. */
-const PEEK_SETTLE_MS = 240
+/** How long a hovering sidebar takes to slide in (--spring-smooth): its lights wait for it. */
+const PEEK_SETTLE_MS = springEasing(SPRINGS.smooth).duration
 
 /** Return the editor only if it is fully mounted and usable (guards against destroyed instances). */
 const getLiveEditor = (editor) => {
@@ -120,12 +125,29 @@ const WINDOW_DRAG_BLOCKER_SELECTOR = [
 export default function EditorLayout(props) {
   const left = useResizableSidebar(220, 200, 340, 'left')
   const right = useResizableSidebar(300, 260, 520, 'right')
-  const { setSidebarTab } = props
+  const { setSidebarTab, documentCardRef, arriving } = props
+  // Where the card is when the project closes is where the next one's flight from the
+  // landing page aims (lib/landingCard.js). A layout effect's cleanup runs while the
+  // card is still in the window.
+  useLayoutEffect(() => () => rememberCardRect(documentCardRef?.current), [documentCardRef])
   // Use splitView/secondaryDoc from props (managed at top-level `Editor`) to avoid
   // shadowing state and keep all parts of the UI in sync.
   const [pendingSearchTarget, setPendingSearchTarget] = useState(null)
   const [isFullscreenChrome, setIsFullscreenChrome] = useState(false)
-  const [focusModeOpen, setFocusModeOpen] = useState(false)
+  // Focus mode is 'open', 'leaving' (zooming back onto the page, still drawn) or
+  // 'closed'. Asking it to close while open lets it leave; it reports when it has.
+  const [focusMode, setFocusMode] = useState('closed')
+  const focusModeOpen = focusMode === 'open'
+  const setFocusModeOpen = useCallback((next) => setFocusMode((current) => {
+    const open = typeof next === 'function' ? next(current === 'open') : next
+    if (open) return 'open'
+    return current === 'closed' ? 'closed' : 'leaving'
+  }), [])
+  const finishLeavingFocusMode = useCallback(() => {
+    setFocusMode((current) => (current === 'leaving' ? 'closed' : current))
+  }, [])
+  // The inspector's foot, where the word count goes while the inspector is docked.
+  const [inspectorFooter, setInspectorFooter] = useState(null)
   const openRightSidebar = right.open
   const pendingSearchTargetRef = useRef(null)
   const fullscreenChromeRef = useRef(false)
@@ -140,30 +162,27 @@ export default function EditorLayout(props) {
   } = props
   // The toolbar's Focus Mode item. The mode stays this page's; the toolbar asks for it
   // and lights its button from what is published back.
-  useEffect(() => documentSurface.onCommand('setFocusMode', ({ open }) => setFocusModeOpen(Boolean(open))), [])
+  useEffect(() => documentSurface.onCommand('setFocusMode', ({ open }) => setFocusModeOpen(Boolean(open))), [setFocusModeOpen])
   useEffect(() => {
     documentSurface.publishViewOptions({ focusMode: focusModeOpen })
   }, [focusModeOpen])
   // Focus mode opens with both sidebars put away (they still hover in from the window's
-  // edges, and its bar can pin them), and gives back the ones that were docked when it
-  // closes.
+  // edges, and its bar can pin them), and gives back the ones that were docked once it
+  // has zoomed back onto the page. Stowed, not unpinned, so the saved layout survives
+  // the app quitting in focus mode. Before paint, so focus mode measures the page as
+  // the writer last saw it and opens on the card it will have.
   const sidebarsRef = useRef({ left, right })
-  useEffect(() => { sidebarsRef.current = { left, right } })
-  const dockedBeforeFocusRef = useRef(null)
-  useEffect(() => {
+  useLayoutEffect(() => { sidebarsRef.current = { left, right } })
+  useLayoutEffect(() => {
     const { left: leftSide, right: rightSide } = sidebarsRef.current
-    if (focusModeOpen) {
-      dockedBeforeFocusRef.current = { left: leftSide.pinned, right: rightSide.pinned }
-      leftSide.collapse()
-      rightSide.collapse()
-      return
+    if (focusMode === 'open') {
+      leftSide.stow()
+      rightSide.stow()
+    } else if (focusMode === 'closed') {
+      leftSide.unstow()
+      rightSide.unstow()
     }
-    const docked = dockedBeforeFocusRef.current
-    if (!docked) return
-    dockedBeforeFocusRef.current = null
-    if (docked.left && !leftSide.pinned) leftSide.togglePin()
-    if (docked.right && !rightSide.pinned) rightSide.togglePin()
-  }, [focusModeOpen])
+  }, [focusMode])
   const bubbles = useBubbleSessions({ docPath: activeDoc || currentDoc, projectName: props.projectName })
   // While a bubble is open its bar is the toolbar, portaled into this slot.
   const [bubbleToolbarSlot, setBubbleToolbarSlot] = useState(null)
@@ -171,7 +190,7 @@ export default function EditorLayout(props) {
   // A bubble takes the place of its pane, which focus mode is drawn over.
   useEffect(() => {
     if (bubbling) setFocusModeOpen(false)
-  }, [bubbling])
+  }, [bubbling, setFocusModeOpen])
   // Citations format in every open editor; the References panel is the shell's.
   useReferences({
     projectName: props.projectName,
@@ -350,6 +369,8 @@ export default function EditorLayout(props) {
 
   // The toolbar's panel items: show a panel, or hide the inspector if it is showing.
   const rightOpen = right.shown
+  // With it open, a note's dot strings to its card there rather than opening a hover note.
+  const notesPanelOpen = rightOpen && props.sidebarTab === 'notes'
   const togglePanel = useCallback((tab) => {
     if (rightOpen && props.sidebarTab === tab) {
       right.collapse()
@@ -407,6 +428,10 @@ export default function EditorLayout(props) {
 
   const leftShown = left.shown
   const activeIsText = isTextDoc(activeDoc || currentDoc)
+  // Focus mode draws prose only: a canvas, map or draft taking the pane ends it.
+  useEffect(() => {
+    if (!activeIsText) setFocusMode('closed')
+  }, [activeIsText])
   const editorMode = pageLayoutState?.mode
   const split = props.splitView
   const lastCopy = props.clipboardHistory?.[0]
@@ -417,7 +442,7 @@ export default function EditorLayout(props) {
       { id: 'document.new', section: 'Document', title: 'New document…', icon: 'new-document', keys: 'Mod+N', keywords: ['create', 'chapter', 'page', 'file'], when: () => Boolean(props.projectName), run: newOf('doc') },
       { id: 'folder.new', section: 'Document', title: 'New folder…', icon: 'folder', keys: 'Mod+Shift+N', keywords: ['create', 'group', 'directory'], when: () => Boolean(props.projectName), run: () => {
         if (!leftShown) left.open()
-        window.dispatchEvent(new CustomEvent('filetree:new-entry', { detail: { type: 'folder', parent: '' } }))
+        window.dispatchEvent(new CustomEvent(FILETREE_NEW_ENTRY, { detail: { type: 'folder', parent: '' } }))
       } },
       { id: 'canvas.new', section: 'Document', title: 'New canvas…', icon: 'canvas', keywords: ['create', 'board', 'cards'], when: () => Boolean(props.projectName), run: newOf('canvas') },
       { id: 'map.new', section: 'Document', title: 'New map…', icon: 'map', keywords: ['create', 'world', 'places'], when: () => Boolean(props.projectName), run: newOf('map') },
@@ -426,6 +451,9 @@ export default function EditorLayout(props) {
       { id: 'clipboard.make-note', section: 'Notes', title: 'Make a note of the last copy', icon: 'note', keywords: ['clipboard', 'paste', 'copied'], when: () => activeIsText && Boolean(lastCopy), run: () => makeNoteFromClipboard(lastCopy) },
       { id: 'search.find', section: 'Search', title: 'Find…', icon: 'search', keys: 'Mod+F', keywords: ['search', 'look for', 'replace', 'selection'], run: findInDocument },
       { id: 'writing.bubble', section: 'Writing', title: 'Bubble the selection', icon: 'chats', keywords: ['rearrange', 'reorder', 'words', 'sentence'], when: () => activeIsText && !bubbling && Boolean(selectionForBubble(getLiveEditor(props.activeEditor))), run: () => bubbles.openFromSelection(getLiveEditor(props.activeEditor)) },
+      { id: 'writing.hide', section: 'Writing', title: 'Hide the selection', icon: 'hide', keywords: ['fold', 'collapse', 'conceal', 'hidden'], when: () => activeIsText && !lock && Boolean(getLiveEditor(props.activeEditor)?.state.selection.empty === false), run: () => getLiveEditor(props.activeEditor)?.chain().focus().setHiddenText().run() },
+      { id: 'writing.show-hidden', section: 'Writing', title: 'Show all hidden text', icon: 'show', keywords: ['unfold', 'expand', 'reveal', 'hidden'], when: () => activeIsText, run: () => getLiveEditor(props.activeEditor)?.commands.setAllHiddenOpen(true) },
+      { id: 'writing.fold-hidden', section: 'Writing', title: 'Fold all hidden text', icon: 'hide', keywords: ['collapse', 'conceal', 'hidden'], when: () => activeIsText, run: () => getLiveEditor(props.activeEditor)?.commands.setAllHiddenOpen(false) },
       { id: 'writing.bubble-paragraph', section: 'Writing', title: 'Bubble this paragraph', icon: 'chats', keywords: ['rearrange', 'reorder', 'sentences'], when: () => activeIsText && !bubbling && Boolean(paragraphForBubble(getLiveEditor(props.activeEditor))), run: () => bubbles.openParagraph(getLiveEditor(props.activeEditor)) },
       { id: 'view.focus-mode', section: 'View', title: focusModeOpen ? 'Leave focus mode' : 'Enter focus mode', icon: 'crosshair', keywords: ['distraction free', 'zen', 'full screen'], when: () => activeIsText, run: () => setFocusModeOpen((open) => !open) },
       { id: 'view.sidebar', section: 'View', title: left.pinned ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', keywords: ['files', 'file tree', 'left panel', 'pin', 'unpin'], run: left.togglePin },
@@ -441,6 +469,25 @@ export default function EditorLayout(props) {
       { id: 'view.typeset', section: 'Print & export', title: editorMode === 'typeset' ? 'Back to Write' : 'Typeset the book', icon: editorMode === 'typeset' ? 'write' : 'type-style', keywords: ['pages', 'layout', 'print', 'book', 'write'], when: () => activeIsText, run: () => send('setEditorMode', { mode: editorMode === 'typeset' ? 'write' : 'typeset' }) },
     ]
   }, [props.projectName, props.activeEditor, bubbles, bubbling, activeIsText, addNote, lastCopy, makeNoteFromClipboard, focusModeOpen, leftShown, rightOpen, left, right, split, editorMode, openRightSidebarTab, lock, lockTarget, findInDocument])
+
+  // What the selection wheel's tools borrow from here (lib/selectionTools.js).
+  const getWheelEditor = useCallback(() => getLiveEditor(props.activeEditor), [props.activeEditor])
+  const setTiles = props.setTiles
+  const wheelCtx = useMemo(() => ({
+    bubbles,
+    addNote,
+    lastHighlightColor: () => documentSurface.lastHighlightColor(),
+    // Through the bridge, like the toolbar's, so the colour is remembered for next time.
+    setHighlight: (color, remember) => shellBridge.send('setHighlight', { color, remember }),
+    workbench: setTiles ? (type) => {
+      const editor = getLiveEditor(props.activeEditor)
+      if (!editor) return
+      const { from, to } = editor.state.selection
+      const text = editor.state.doc.textBetween(from, to, ' ')
+      setTiles((tiles) => [{ id: Date.now(), type, text, from, to, anchor: text, doc: activeDoc || currentDoc }, ...tiles])
+      openRightSidebarTab('workbench')
+    } : null,
+  }), [bubbles, addNote, setTiles, props.activeEditor, activeDoc, currentDoc, openRightSidebarTab])
 
   const handleContextMenu = useEditorContextMenu({
     editor: props.activeEditor,
@@ -469,8 +516,8 @@ export default function EditorLayout(props) {
   const openLeftSidebar = left.open
   useEffect(() => {
     const reveal = () => openLeftSidebar?.()
-    window.addEventListener('filetree:new-entry', reveal)
-    return () => window.removeEventListener('filetree:new-entry', reveal)
+    window.addEventListener(FILETREE_NEW_ENTRY, reveal)
+    return () => window.removeEventListener(FILETREE_NEW_ENTRY, reveal)
   }, [openLeftSidebar])
 
   // Select and scroll to a note's text in the active editor. Accepts a note object
@@ -632,16 +679,16 @@ export default function EditorLayout(props) {
         })
         .catch((error) => console.error('[import] failed:', error))
     }
-    window.addEventListener('inkblot:import-script', onImport)
-    return () => window.removeEventListener('inkblot:import-script', onImport)
+    window.addEventListener(IMPORT_SCRIPT, onImport)
+    return () => window.removeEventListener(IMPORT_SCRIPT, onImport)
   }, [activeDoc, currentDoc, importOpen, importProject, importRefresh])
 
   // File ▸ Page Setup….
   const [pageSetupOpen, setPageSetupOpen] = useState(false)
   useEffect(() => {
     const open = () => setPageSetupOpen(true)
-    window.addEventListener('inkblot:page-setup', open)
-    return () => window.removeEventListener('inkblot:page-setup', open)
+    window.addEventListener(PAGE_SETUP, open)
+    return () => window.removeEventListener(PAGE_SETUP, open)
   }, [])
 
   useSidebarCommands({
@@ -704,28 +751,6 @@ export default function EditorLayout(props) {
     }
   }, [currentDoc, editor, jumpToText, pendingSearchTarget])
 
-  // Global "open-note" event: jump to the note's text and reveal it in the notes panel.
-  useEffect(() => {
-    const handler = e => {
-      const noteId = typeof e.detail === 'string' ? e.detail : e.detail?.id
-      const source = typeof e.detail === 'object' && e.detail !== null ? e.detail.source : null
-      const note = (notesByDoc?.[currentDoc] || []).find(item => item.id === noteId)
-
-      if (note && source !== 'editor-dot') {
-        jumpToText(note)
-      }
-
-      openRightSidebarTab('notes')
-      setTimeout(() => {
-        const el = document.getElementById(`note-${noteId}`)
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }, 50)
-    }
-
-    window.addEventListener('open-note', handler)
-    return () => window.removeEventListener('open-note', handler)
-  }, [currentDoc, jumpToText, notesByDoc, openRightSidebarTab])
-
   const sidebarResizing = left.resizing || right.resizing
 
   // A canvas never draws its own toolbar: while no card is being edited it publishes
@@ -734,8 +759,8 @@ export default function EditorLayout(props) {
     ? null
     : (activeIsCanvas && !toolbarEditor ? NATIVE_CANVAS_TOOLBAR : null)
 
-  // The page's clearance at the top (`--app-titlebar-height`, which documents scroll
-  // under): taller when the toolbar shows its labels.
+  // The page's clearance at the top (`--app-titlebar-height`, where the document's
+  // scroller starts): taller when the toolbar shows its labels.
   const pageToolbarStyle = toolbarDisplay === 'iconAndLabel' ? { '--app-titlebar-height': '56px' } : undefined
 
   // The traffic lights stay where the landing page has them (the left sidebar's first
@@ -768,8 +793,9 @@ export default function EditorLayout(props) {
     <CanvasToolbarSlotContext.Provider value={canvasToolbarTarget}>
     <CompareToolbarSlotContext.Provider value={comparing ? compareToolbarSlot : null}>
     <div
-      className={`editor-page-wrapper${isFullscreenChrome ? ' is-fullscreen' : ''}${focusModeOpen ? ' is-focus-mode' : ''}${sidebarResizing ? ' is-sidebar-resizing' : ''}`}
+      className={`editor-page-wrapper${isFullscreenChrome ? ' is-fullscreen' : ''}${focusMode !== 'closed' ? ' is-focus-mode' : ''}${focusMode === 'leaving' ? ' is-leaving-focus-mode' : ''}${sidebarResizing ? ' is-sidebar-resizing' : ''}`}
       style={pageToolbarStyle}
+      data-arrival={arriving}
       onContextMenu={handleContextMenu}
     >
       {pageSetupOpen && printLayout.activeEditor ? (
@@ -802,6 +828,7 @@ export default function EditorLayout(props) {
         />
 
         <div
+          ref={documentCardRef}
           className={`document-card${props.splitView === 'editor' && !comparing && !focusModeOpen ? ' is-split' : ''}${bubbling && !comparing ? ' is-bubbling' : ''}${left.pinned ? ' has-left-dock' : ''}${right.pinned ? ' has-right-dock' : ''}${left.gliding ? ' is-left-gliding' : ''}${right.gliding ? ' is-right-gliding' : ''}`}
         >
           <div
@@ -856,12 +883,14 @@ export default function EditorLayout(props) {
 
           <EditorCanvas
             {...props}
-            focusModeOpen={focusModeOpen}
+            focusMode={focusMode}
             onExitFocusMode={() => setFocusModeOpen(false)}
+            onFocusModeExited={finishLeavingFocusMode}
             focusSidebars={focusSidebars}
             bubble={comparing ? null : bubbles.open}
             onCloseBubble={bubbles.close}
             bubbleToolbarSlot={bubbleToolbarSlot}
+            wordCountSlot={right.pinned ? inspectorFooter : null}
           />
         </div>
 
@@ -875,6 +904,7 @@ export default function EditorLayout(props) {
           gliding={right.gliding}
           togglePin={right.togglePin}
           onAutoCollapse={right.collapse}
+          footerRef={setInspectorFooter}
 
           sidebarTab={props.sidebarTab}
           setSidebarTab={openRightSidebarTab}
@@ -910,7 +940,10 @@ export default function EditorLayout(props) {
           notesByDoc={props.notesByDoc}
           setNotesForDoc={props.setNotesForDoc}
           projectName={props.projectName}
+          notesPanelOpen={notesPanelOpen}
         />
+        <NotePanelTether notesByDoc={props.notesByDoc} panelOpen={notesPanelOpen} />
+        <SelectionWheel getEditor={getWheelEditor} ctx={wheelCtx} enabled={activeIsText && !bubbling && !lock} />
 
 
       </div>

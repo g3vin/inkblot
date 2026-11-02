@@ -137,7 +137,7 @@ Your operating system may ask for microphone permission. You can revoke it in yo
 
 ## Read Aloud and Speech Features
 
-Inkblot's read-aloud feature converts text into speech on your device with the Kokoro speech model. It falls back to your operating system's built-in voices when that model is not available. Text you have read aloud is not sent to us.
+Inkblot's read-aloud feature converts text into speech on your device with Kyutai's Pocket TTS speech model, which you download once from the read-aloud controls. It falls back to your operating system's built-in voices where that model can't run. Text you have read aloud is not sent to us.
 
 Inkblot may download speech model files from third-party model hosts, such as Hugging Face, when they are not already on your device. These downloads do not send your document text.
 

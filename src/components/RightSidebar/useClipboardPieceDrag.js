@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { dragHandoff, DragPayloadKind } from '../../bridge'
 import { clipboardDropTarget } from '../../lib/clipboardDropTarget'
+import { SPRINGS, prefersReducedMotion, spring, springAt, trackSample, velocityFrom } from '../../ui/physics.js'
 
 // How far the pointer travels before a press becomes a drag.
 const DRAG_THRESHOLD = 4
@@ -26,16 +27,10 @@ const DRAG_THRESHOLD = 4
 // may wander while resting.
 const DWELL_MS = 650
 const DWELL_TOLERANCE = 4
-// --dur-fast and --dur-base: the glide to the pointer, and the glide home.
-const GLIDE_MS = 120
-const HOME_MS = 180
-
-const reducedMotion = () => (
-  typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-)
-
-// --ease-out
-const easeOut = (t) => 1 - Math.pow(1 - t, 3)
+// The glide to the pointer or into the page, and the glide home, which sets off at
+// the speed the hand let go at.
+const GLIDE = spring(SPRINGS.quick)
+const HOME = spring(SPRINGS.momentum)
 
 export function useClipboardPieceDrag() {
   // What the ghost shows. Its position is written straight to the element, not
@@ -54,21 +49,31 @@ export function useClipboardPieceDrag() {
     if (el) el.dataset.settled = visible ? 'false' : 'true'
   }
 
-  // Ease the ghost from where it is now to `to()`, re-reading `to` each frame so a
-  // glide toward the pointer follows the pointer while it moves.
-  const glide = (drag, to, duration, done) => {
+  // Spring the ghost from where it is, at the speed it is going, to `to()`, re-read
+  // each frame so a glide toward the pointer follows the pointer while it moves.
+  const glide = (drag, to, params, done) => {
     cancelAnimationFrame(drag.frame)
-    const from = { ...drag.at }
-    const started = performance.now()
-    const span = reducedMotion() ? 0 : duration
-    const step = (now) => {
-      const t = span ? Math.min(1, (now - started) / span) : 1
+    let last = performance.now()
+    const step = () => {
+      const now = performance.now()
+      const dt = Math.min(64, Math.max(0, now - last))
+      last = now
       const target = to()
-      const k = easeOut(t)
-      drag.at = { left: from.left + (target.left - from.left) * k, top: from.top + (target.top - from.top) * k }
+      if (prefersReducedMotion()) {
+        drag.at = { ...target }
+        drag.v = { x: 0, y: 0 }
+      } else {
+        const x = springAt(params, drag.at.left, target.left, drag.v.x, dt)
+        const y = springAt(params, drag.at.top, target.top, drag.v.y, dt)
+        drag.at = { left: x.value, top: y.value }
+        drag.v = { x: x.velocity, y: y.velocity }
+      }
+      const arrived = Math.hypot(target.left - drag.at.left, target.top - drag.at.top) < 0.5
+        && Math.hypot(drag.v.x, drag.v.y) * 16 < 0.5
+      if (arrived) drag.at = { ...target }
       place(drag.at.left, drag.at.top)
-      if (t < 1) drag.frame = requestAnimationFrame(step)
-      else { drag.frame = 0; drag.gliding = false; done?.() }
+      if (!arrived) drag.frame = requestAnimationFrame(step)
+      else { drag.frame = 0; drag.gliding = false; drag.v = { x: 0, y: 0 }; done?.() }
     }
     drag.gliding = true
     drag.frame = requestAnimationFrame(step)
@@ -98,7 +103,9 @@ export function useClipboardPieceDrag() {
     setGhostVisible(true)
     window.removeEventListener('pointermove', drag.onMove, true)
     clearTimeout(drag.dwell)
-    glide(drag, () => drag.home, HOME_MS, finish)
+    // Thrown, it keeps the throw's speed on the way home.
+    if (!drag.gliding) drag.v = velocityFrom(drag.samples)
+    glide(drag, () => drag.home, HOME, finish)
   }
 
   const settleIntoPage = (drag) => {
@@ -106,7 +113,7 @@ export function useClipboardPieceDrag() {
     const rect = clipboardDropTarget()?.preview(drag.pointer.x, drag.pointer.y, drag.entry.text)
     if (!rect) return
     drag.previewAt = { ...drag.pointer }
-    glide(drag, () => ({ left: rect.left, top: rect.top }), GLIDE_MS, () => {
+    glide(drag, () => ({ left: rect.left, top: rect.top }), GLIDE, () => {
       if (drag.previewAt) setGhostVisible(false)
     })
   }
@@ -122,6 +129,7 @@ export function useClipboardPieceDrag() {
 
   const move = (drag, x, y) => {
     drag.pointer = { x, y }
+    trackSample(drag.samples, { t: performance.now(), x, y })
     dragHandoff.moveTo(x, y)
 
     if (drag.previewAt) {
@@ -129,7 +137,7 @@ export function useClipboardPieceDrag() {
       // Moving again lifts the text back out of the page to the pointer.
       drag.previewAt = null
       setGhostVisible(true)
-      glide(drag, () => atPointer(drag), GLIDE_MS)
+      glide(drag, () => atPointer(drag), GLIDE)
     } else if (!drag.gliding) {
       drag.at = atPointer(drag)
       place(drag.at.left, drag.at.top)
@@ -153,6 +161,8 @@ export function useClipboardPieceDrag() {
       pointer: { x: event.clientX, y: event.clientY },
       home: { left: rect.left, top: rect.top },
       at: { left: rect.left, top: rect.top },
+      v: { x: 0, y: 0 },
+      samples: [],
       width: rect.width,
       lineHeight,
       lifted: false,
@@ -211,7 +221,7 @@ export function useClipboardPieceDrag() {
     const drag = dragRef.current
     if (!ghost || !drag) return
     place(drag.at.left, drag.at.top)
-    glide(drag, () => atPointer(drag), GLIDE_MS)
+    glide(drag, () => atPointer(drag), GLIDE)
   // Runs once per lift; the drag itself lives in the ref.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ghost])

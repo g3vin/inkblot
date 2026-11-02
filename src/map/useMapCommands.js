@@ -2,7 +2,7 @@
  * useMapCommands.js — a map's actions in the command palette (⌘K).
  *
  * Registered by the active map only, so ⌘K offers the map you are looking at. The
- * tools keep their single-letter keys, handled by the map itself (MapSurface's
+ * tools keep their single-letter keys, handled by the map itself (useMapInput's
  * onKeyDown), so they are shown here (`shortcut`) rather than bound (`keys`).
  */
 import { useCommands } from '../lib/commands'

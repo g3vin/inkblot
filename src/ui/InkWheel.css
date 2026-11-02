@@ -66,9 +66,8 @@
   opacity: var(--opacity, 1);
   transform: translate(var(--tx, 0), var(--ty, 0)) scale(var(--scale, 1));
   /* Blooming: every dot at once, the way the ring folds back. */
-  transition:
-    transform var(--dur-base) var(--ease-out),
-    opacity var(--dur-fast) var(--ease-out);
+  transition: transform var(--spring-smooth-dur) var(--spring-smooth),
+    opacity var(--spring-quick-dur) var(--spring-quick);
 }
 
 /* The dot itself, inside the element that places it, so it can stretch along the way it
@@ -82,7 +81,7 @@
   box-shadow:
     var(--shadow-float),
     inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 10%, transparent);
-  transition: box-shadow var(--dur-fast) var(--ease-out);
+  transition: box-shadow var(--spring-quick-dur) var(--spring-quick);
 }
 
 /* Once open, the hand moves the dots: InkWheel paints them every frame, and a swap
@@ -90,21 +89,20 @@
    eases. The held dot follows from the start, even mid-bloom. */
 [data-phase='ready'] .ib-ink-wheel-dot,
 [data-phase='open'] .ib-ink-wheel-held {
-  transition: opacity var(--dur-fast) var(--ease-out);
+  transition: opacity var(--spring-quick-dur) var(--spring-quick);
 }
 
 /* The taken ink settles in the middle. */
 [data-phase='settling'] .ib-ink-wheel-dot[data-picked='true'] {
-  transition: transform var(--dur-fast) var(--ease-out);
+  transition: transform var(--spring-quick-dur) var(--spring-quick);
 }
 
 /* Folding back the way it came: counter-clockwise and faster, while the new colour
    moves to the middle; then the new colour sinks into the control. */
 [data-phase='settling'] .ib-ink-wheel-dot:not([data-picked='true']),
 [data-phase='closing'] .ib-ink-wheel-dot {
-  transition:
-    transform var(--dur-fast) var(--ease-in) calc(var(--close-order) * 8ms),
-    opacity var(--dur-fast) var(--ease-in) calc(var(--close-order) * 8ms);
+  transition: transform var(--spring-exit-dur) var(--spring-exit) calc(var(--close-order) * 8ms),
+    opacity var(--spring-exit-dur) var(--spring-exit) calc(var(--close-order) * 8ms);
 }
 
 /* Each dot stretches along its path as it travels and rounds off as it lands. The held
@@ -119,19 +117,19 @@
   40% { transform: rotate(var(--axis, 0deg)) scale(1.3, 0.8) rotate(calc(var(--axis, 0deg) * -1)); }
 }
 [data-phase='open'] .ib-ink-wheel-dot:not(.ib-ink-wheel-held) .ib-ink-wheel-face {
-  animation: ib-ink-stretch var(--dur-base) var(--ease-out) both;
+  animation: ib-ink-stretch var(--spring-smooth-dur) var(--spring-smooth) both;
 }
 [data-phase='settling'] .ib-ink-wheel-dot[data-picked='true'] .ib-ink-wheel-face {
-  animation: ib-ink-stretch var(--dur-fast) var(--ease-out) both;
+  animation: ib-ink-stretch var(--spring-quick-dur) var(--spring-quick) both;
 }
 [data-phase='settling'] .ib-ink-wheel-dot:not([data-picked='true']):not(.ib-ink-wheel-held) .ib-ink-wheel-face,
 [data-phase='settling'] .ib-ink-wheel-held[data-taken='true'] .ib-ink-wheel-face,
 [data-phase='closing'] .ib-ink-wheel-dot:not([data-picked='true']):not(.ib-ink-wheel-held) .ib-ink-wheel-face,
 [data-phase='closing'] .ib-ink-wheel-held[data-taken='true'] .ib-ink-wheel-face {
-  animation: ib-ink-stretch var(--dur-fast) var(--ease-in) calc(var(--close-order) * 8ms) both;
+  animation: ib-ink-stretch var(--spring-exit-dur) var(--spring-exit) calc(var(--close-order) * 8ms) both;
 }
 [data-phase='closing'] .ib-ink-wheel-dot[data-picked='true'] .ib-ink-wheel-face {
-  animation: ib-ink-stretch-home var(--dur-fast) var(--ease-in) both;
+  animation: ib-ink-stretch-home var(--spring-exit-dur) var(--spring-exit) both;
 }
 
 /* The ink the keyboard is on. (A hand's target says so by leaning in instead.) */

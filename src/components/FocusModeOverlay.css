@@ -7,42 +7,47 @@
   inset: 0;
   z-index: 70;
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: flex-start;
   overflow: hidden;
-  padding: clamp(32px, 8vh, 96px) clamp(28px, 10vw, 150px);
+  padding: 0 clamp(28px, 10vw, 150px);
   background: transparent;
   color: var(--text-primary);
   isolation: isolate;
 }
 
-.focus-mode-overlay::before {
-  content: '';
+/* The paper focus mode is written on. Its own element so the zoom can fade it. */
+.focus-mode-backdrop {
   position: absolute;
   inset: 0;
   z-index: 0;
   background: var(--app-bg);
-  clip-path: circle(150% at 50% 50%);
   pointer-events: none;
 }
 
-.focus-mode-overlay.is-opening::before {
-  animation: focus-mode-bg-reveal 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.focus-mode-text {
+/* Carries the zooms in and out, so they never fight the column's centring. */
+.focus-mode-stage {
   position: relative;
   z-index: 1;
   width: min(980px, 100%);
+}
+
+/* Placed by script (FocusModeOverlay): translateY centres the sentence written in. It
+   glides only for small shifts at rest, such as a line wrapping while typing. */
+.focus-mode-text {
+  position: relative;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 0.72em;
+  font-family: var(--font-editor);
   line-height: 1.38;
-  font-weight: 520;
   text-align: left;
-  transform: translateY(var(--focus-mode-text-offset, 0px));
-  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
+}
+
+.focus-mode-text[data-glide='true'] {
+  transition: transform var(--spring-smooth-dur) var(--spring-smooth);
 }
 
 .focus-mode-text.is-paragraph-context {
@@ -55,11 +60,8 @@
   display: block;
   font-size: var(--focus-mode-context-font-size, 28px);
   white-space: pre-wrap;
-  transition:
-    color 220ms ease,
-    font-size 260ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 220ms ease,
-    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: color var(--spring-smooth-dur) var(--spring-smooth),
+    opacity var(--spring-smooth-dur) var(--spring-smooth);
 }
 
 .focus-mode-text.is-paragraph-context .focus-mode-sentence {
@@ -79,28 +81,51 @@
   font-size: var(--focus-mode-font-size, 42px);
 }
 
+/* The empty line after a sentence, where the next one will be written. */
+.focus-mode-text .focus-mode-slot {
+  display: block;
+}
+
+/* The buffer beyond the before/after setting: hidden at rest, there while the fingers
+   scroll, and gone again as they lift and the text glides on. */
+.focus-mode-sentence.is-outside {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.focus-mode-overlay.is-scrolling:not(.is-gliding) .focus-mode-sentence.is-outside {
+  opacity: 0.6;
+}
+
+/* While scrolling, the sentence nearest the centre is the one lit. */
+.focus-mode-overlay.is-scrolling .focus-mode-sentence.current:not(.is-centred) {
+  color: color-mix(in srgb, var(--text-primary) 36%, transparent);
+}
+
+.focus-mode-overlay.is-scrolling .focus-mode-sentence.is-centred {
+  color: var(--text-primary);
+}
+
 .focus-mode-prefix {
   color: color-mix(in srgb, var(--text-primary) 36%, transparent);
   font-size: var(--focus-mode-context-font-size, 28px);
   white-space: pre-wrap;
-  transition: font-size 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.focus-mode-overlay.is-opening .focus-mode-sentence,
-.focus-mode-overlay.is-opening .focus-mode-prefix {
-  opacity: 0;
-  transform:
-    translateY(calc(var(--focus-mode-sentence-direction, 0) * 12px))
-    scale(0.985);
-  animation:
-    focus-mode-context-line-in 280ms cubic-bezier(0.2, 0.82, 0.2, 1) var(--focus-mode-sentence-delay, 360ms)
-    both;
+.focus-mode-selection {
+  background: var(--select-bg);
+  color: inherit;
+  border-radius: var(--radius-sm);
 }
 
-.focus-mode-overlay.is-opening .focus-mode-sentence.current {
-  transform: translateY(0) scale(0.92);
-  animation-name: focus-mode-current-line-in;
-  animation-duration: 300ms;
+/* Paragraph and sentence numbers, typed small in the corner. */
+.focus-mode-position {
+  position: absolute;
+  z-index: 1;
+  top: calc(var(--app-titlebar-height) + var(--space-2));
+  left: var(--space-5);
+  color: var(--text-secondary);
+  pointer-events: none;
 }
 
 .focus-mode-caret {
@@ -110,7 +135,7 @@
   height: 1em;
   vertical-align: -0.12em;
   pointer-events: none;
-  animation: focus-mode-caret-blink 1s steps(2, start) infinite;
+  animation: focus-mode-caret-blink 1.06s step-end infinite;
 }
 
 .focus-mode-caret::after {
@@ -124,52 +149,15 @@
   background: var(--accent-color);
 }
 
+/* Solid while typing, as a native caret is; the blink starts over, visible, after. */
+.focus-mode-overlay.is-typing .focus-mode-caret {
+  animation: none;
+}
+
+/* Visible first, so a caret that moves never starts hidden. */
 @keyframes focus-mode-caret-blink {
-  0%,
-  45% {
-    opacity: 1;
-  }
-  46%,
-  100% {
-    opacity: 0;
-  }
-}
-
-@keyframes focus-mode-bg-reveal {
-  from {
-    clip-path: circle(0% at 50% 50%);
-  }
-  to {
-    clip-path: circle(150% at 50% 50%);
-  }
-}
-
-@keyframes focus-mode-current-line-in {
-  0% {
-    opacity: 0;
-    transform: translateY(0) scale(0.92);
-  }
-  68% {
-    opacity: 1;
-    transform: translateY(0) scale(1.035);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes focus-mode-context-line-in {
-  from {
-    opacity: 0;
-    transform:
-      translateY(calc(var(--focus-mode-sentence-direction, 0) * 12px))
-      scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  0% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 /* The bar's zone: the band at the card's top that brings the bar in. */
@@ -194,21 +182,14 @@
   opacity: 0;
   transform: translateY(-100%);
   pointer-events: none;
-  transition:
-    opacity var(--dur-base) var(--ease-out),
-    transform var(--dur-base) var(--ease-out);
+  transition: opacity var(--spring-smooth-dur) var(--spring-smooth),
+    transform var(--spring-smooth-dur) var(--spring-smooth);
 }
 
 .focus-mode-bar-zone.is-shown .focus-mode-bar {
   opacity: 1;
   transform: none;
   pointer-events: auto;
-}
-
-/* Hidden until the opening animation has played. */
-.focus-mode-overlay.is-opening .focus-mode-bar-zone:not(:hover) .focus-mode-bar {
-  opacity: 0;
-  transform: translateY(-100%);
 }
 
 .focus-mode-bar-controls {
@@ -246,7 +227,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .focus-mode-bar { transition: none; }
+  .focus-mode-bar,
+  .focus-mode-text[data-glide='true'],
+  .focus-mode-sentence { transition: none; }
+  .focus-mode-caret { animation: none; }
 }
 
 @media (max-width: 760px) {

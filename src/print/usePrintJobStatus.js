@@ -6,6 +6,7 @@
  * then goes; a failure stays until the next job, so it is read.
  */
 import { useEffect, useState } from 'react'
+import { PRINT_JOB } from '../lib/appEvents'
 
 const FORMAT_LABELS = { pdf: 'PDF', epub: 'EPUB', markdown: 'Markdown', html: 'HTML', docx: 'Word', plainText: 'Plain Text', fountain: 'Fountain', fdx: 'Final Draft', csv: 'Report', coverPdf: 'Cover PDF' }
 const DONE_LINGER_MS = 6000
@@ -38,10 +39,10 @@ export function usePrintJobStatus() {
       setJob(text ? { ...status, text } : null)
       if (status.phase === 'done') timer = setTimeout(() => setJob(null), DONE_LINGER_MS)
     }
-    window.addEventListener('inkblot:print-job', onStatus)
+    window.addEventListener(PRINT_JOB, onStatus)
     return () => {
       clearTimeout(timer)
-      window.removeEventListener('inkblot:print-job', onStatus)
+      window.removeEventListener(PRINT_JOB, onStatus)
     }
   }, [])
 

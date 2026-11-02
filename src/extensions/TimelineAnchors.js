@@ -35,7 +35,7 @@ const EMPTY = { docPath: null, ranges: [], context: EMPTY_CONTEXT, decorations: 
 const truncate = (text, length) => (text.length > length ? `${text.slice(0, length - 1)}…` : text)
 
 function chipWidget(range, event, color) {
-  return (view) => {
+  return () => {
     const chip = document.createElement('span')
     chip.className = 'timeline-range-chip'
     chip.contentEditable = 'false'
@@ -46,7 +46,6 @@ function chipWidget(range, event, color) {
       pointer.preventDefault()
       pointer.stopPropagation()
       requestTimelineReveal(range.eventId)
-      view.dom.dispatchEvent(new CustomEvent('timeline:chip', { bubbles: true, detail: { eventId: range.eventId, rangeId: range.id } }))
     })
     return chip
   }
@@ -77,7 +76,6 @@ function handleWidget(range, end, color) {
         handle.removeEventListener('pointermove', onMove)
         handle.removeEventListener('pointerup', onUp)
         handle.removeEventListener('pointercancel', onUp)
-        view.dom.dispatchEvent(new CustomEvent('timeline:range-edited', { bubbles: true, detail: { rangeId: range.id } }))
       }
       handle.addEventListener('pointermove', onMove)
       handle.addEventListener('pointerup', onUp)

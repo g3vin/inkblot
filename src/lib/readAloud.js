@@ -5,96 +5,39 @@
  *  - Extract readable text from the editor along with a char→doc-position
  *    map and per-word ranges, so the UI can highlight the word being spoken.
  *  - Split that text into speakable chunks at paragraph/sentence/clause
- *    boundaries (Kokoro degrades on long inputs).
- *  - Generate audio with the Kokoro TTS model: prefers the native Rust
- *    backend (kokoro_commands), falling back to the same model run in WASM by
- *    transformers.js. Both take their phonemes from lib/readAloudVoice.ts.
- *    Voice .bin files ship in the app bundle (see KOKORO_VOICE_ASSETS).
+ *    boundaries, so the first audio is ready quickly and highlighting stays in step.
+ *  - Generate each chunk's audio with Pocket TTS, which runs natively
+ *    (`inkblot-models/src/pocket_speech.rs`) from a model downloaded once. Where there
+ *    is no native backend (a plain browser), the caller uses the system voices.
  */
 import { invoke } from '@tauri-apps/api/core'
+import { foldedRunAt } from '../extensions/HiddenText'
 
-const KOKORO_MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX'
-const KOKORO_OPTIONS = {
-  dtype: 'q8',
-  device: 'wasm',
-}
-const KOKORO_MODEL_LOAD_TIMEOUT_MS = 120000
-const KOKORO_GENERATE_TIMEOUT_MS = 20000
-const NATIVE_KOKORO_GENERATE_TIMEOUT_MS = 180000
-const NATIVE_KOKORO_PREWARM_TIMEOUT_MS = 180000
-const KOKORO_GENERATE_TIMEOUT_CODE = 'KOKORO_GENERATE_TIMEOUT'
-export const DEFAULT_READ_ALOUD_VOICE = 'af_heart'
+// A chunk takes a second or two; this is for a backend that has stopped answering.
+const SPEECH_GENERATE_TIMEOUT_MS = 120000
+const SPEECH_PREWARM_TIMEOUT_MS = 120000
+const SPEECH_TIMEOUT_CODE = 'SPEECH_TIMEOUT'
+const SPEECH_UNAVAILABLE_CODE = 'SPEECH_UNAVAILABLE'
+const MODEL_NOT_INSTALLED = 'MODEL_NOT_INSTALLED'
+
+/**
+ * The voices Read Aloud offers, by Pocket TTS's names for them. The same ids are
+ * `VOICES` in `pocket_speech.rs`, which downloads them; the `speech` suite checks the
+ * two lists agree.
+ */
 export const READ_ALOUD_VOICES = [
-  { id: 'af_heart', name: 'Heart', language: 'American', gender: 'Female', grade: 'A' },
-  { id: 'af_bella', name: 'Bella', language: 'American', gender: 'Female', grade: 'A-' },
-  { id: 'af_nicole', name: 'Nicole', language: 'American', gender: 'Female', grade: 'B-' },
-  { id: 'af_sarah', name: 'Sarah', language: 'American', gender: 'Female', grade: 'C+' },
-  { id: 'af_kore', name: 'Kore', language: 'American', gender: 'Female', grade: 'C+' },
-  { id: 'af_aoede', name: 'Aoede', language: 'American', gender: 'Female', grade: 'C+' },
-  { id: 'af_nova', name: 'Nova', language: 'American', gender: 'Female', grade: 'C' },
-  { id: 'af_alloy', name: 'Alloy', language: 'American', gender: 'Female', grade: 'C' },
-  { id: 'af_sky', name: 'Sky', language: 'American', gender: 'Female', grade: 'C-' },
-  { id: 'af_river', name: 'River', language: 'American', gender: 'Female', grade: 'D' },
-  { id: 'af_jessica', name: 'Jessica', language: 'American', gender: 'Female', grade: 'D' },
-  { id: 'am_michael', name: 'Michael', language: 'American', gender: 'Male', grade: 'C+' },
-  { id: 'am_fenrir', name: 'Fenrir', language: 'American', gender: 'Male', grade: 'C+' },
-  { id: 'am_puck', name: 'Puck', language: 'American', gender: 'Male', grade: 'C+' },
-  { id: 'am_echo', name: 'Echo', language: 'American', gender: 'Male', grade: 'D' },
-  { id: 'am_eric', name: 'Eric', language: 'American', gender: 'Male', grade: 'D' },
-  { id: 'am_liam', name: 'Liam', language: 'American', gender: 'Male', grade: 'D' },
-  { id: 'am_onyx', name: 'Onyx', language: 'American', gender: 'Male', grade: 'D' },
-  { id: 'am_santa', name: 'Santa', language: 'American', gender: 'Male', grade: 'D-' },
-  { id: 'am_adam', name: 'Adam', language: 'American', gender: 'Male', grade: 'F+' },
-  { id: 'bf_emma', name: 'Emma', language: 'British', gender: 'Female', grade: 'B-' },
-  { id: 'bf_isabella', name: 'Isabella', language: 'British', gender: 'Female', grade: 'C' },
-  { id: 'bf_alice', name: 'Alice', language: 'British', gender: 'Female', grade: 'D' },
-  { id: 'bf_lily', name: 'Lily', language: 'British', gender: 'Female', grade: 'D' },
-  { id: 'bm_george', name: 'George', language: 'British', gender: 'Male', grade: 'C' },
-  { id: 'bm_fable', name: 'Fable', language: 'British', gender: 'Male', grade: 'C' },
-  { id: 'bm_lewis', name: 'Lewis', language: 'British', gender: 'Male', grade: 'D+' },
-  { id: 'bm_daniel', name: 'Daniel', language: 'British', gender: 'Male', grade: 'D' },
+  { id: 'alba', name: 'Alba' },
+  { id: 'azelma', name: 'Azelma' },
+  { id: 'george', name: 'George' },
+  { id: 'mary', name: 'Mary' },
+  { id: 'peter_yearsley', name: 'Peter' },
+  { id: 'stuart_bell', name: 'Stuart' },
 ]
-const KOKORO_VOICE_ASSETS = import.meta.glob([
-  '../../node_modules/kokoro-js/voices/af_heart.bin',
-  '../../node_modules/kokoro-js/voices/af_bella.bin',
-  '../../node_modules/kokoro-js/voices/af_nicole.bin',
-  '../../node_modules/kokoro-js/voices/af_sarah.bin',
-  '../../node_modules/kokoro-js/voices/af_kore.bin',
-  '../../node_modules/kokoro-js/voices/af_aoede.bin',
-  '../../node_modules/kokoro-js/voices/af_nova.bin',
-  '../../node_modules/kokoro-js/voices/af_alloy.bin',
-  '../../node_modules/kokoro-js/voices/af_sky.bin',
-  '../../node_modules/kokoro-js/voices/af_river.bin',
-  '../../node_modules/kokoro-js/voices/af_jessica.bin',
-  '../../node_modules/kokoro-js/voices/am_michael.bin',
-  '../../node_modules/kokoro-js/voices/am_fenrir.bin',
-  '../../node_modules/kokoro-js/voices/am_puck.bin',
-  '../../node_modules/kokoro-js/voices/am_echo.bin',
-  '../../node_modules/kokoro-js/voices/am_eric.bin',
-  '../../node_modules/kokoro-js/voices/am_liam.bin',
-  '../../node_modules/kokoro-js/voices/am_onyx.bin',
-  '../../node_modules/kokoro-js/voices/am_santa.bin',
-  '../../node_modules/kokoro-js/voices/am_adam.bin',
-  '../../node_modules/kokoro-js/voices/bf_emma.bin',
-  '../../node_modules/kokoro-js/voices/bf_isabella.bin',
-  '../../node_modules/kokoro-js/voices/bf_alice.bin',
-  '../../node_modules/kokoro-js/voices/bf_lily.bin',
-  '../../node_modules/kokoro-js/voices/bm_george.bin',
-  '../../node_modules/kokoro-js/voices/bm_fable.bin',
-  '../../node_modules/kokoro-js/voices/bm_lewis.bin',
-  '../../node_modules/kokoro-js/voices/bm_daniel.bin',
-], {
-  query: '?url',
-  import: 'default',
-  eager: true,
-})
+export const DEFAULT_READ_ALOUD_VOICE = 'alba'
+
 const MAX_READ_ALOUD_CHUNK_LENGTH = 220
 const READ_ALOUD_SENTENCE_END_PATTERN = /[.!?]+["')\]}»”’]*$/
 const READ_ALOUD_CLAUSE_END_PATTERN = /[,;:]["')\]}»”’]*$/
-
-let kokoroPromise = null
-let transformersConfigured = false
-const voiceStyles = new Map()
 
 /**
  * Flatten the editor doc (or current selection) into plain text plus:
@@ -139,6 +82,8 @@ export function getReadableEditorPayload(editor, { scope = 'auto' } = {}) {
     }
 
     if (!node.isText || !node.text) return true
+    // Folded text is out of sight, so it isn't read either. Opened, it is read like the rest.
+    if (foldedRunAt(editor.state, pos)) return false
 
     const nodeStart = pos
     const nodeEnd = pos + node.text.length
@@ -182,100 +127,6 @@ export function getReadableEditorPayload(editor, { scope = 'auto' } = {}) {
   }
 }
 
-/**
- * Kokoro in the webview, for when the native backend isn't there (`npm run dev` in a
- * browser). The model and tokenizer come from the same Hugging Face repository the
- * native backend downloads.
- */
-async function getWebviewKokoro(onProgress) {
-  await configureTransformersForTauri()
-
-  if (!kokoroPromise) {
-    kokoroPromise = import('@huggingface/transformers')
-      .then(({ StyleTextToSpeech2Model, AutoTokenizer }) => withTimeout(
-        Promise.all([
-          StyleTextToSpeech2Model.from_pretrained(KOKORO_MODEL_ID, {
-            ...KOKORO_OPTIONS,
-            progress_callback: onProgress,
-          }),
-          AutoTokenizer.from_pretrained(KOKORO_MODEL_ID, { progress_callback: onProgress }),
-        ]),
-        KOKORO_MODEL_LOAD_TIMEOUT_MS,
-        'Kokoro model load timed out. The first load needs to download the on-device model once; check your connection or install the model locally.'
-      ))
-      .then(([model, tokenizer]) => ({ model, tokenizer }))
-      .catch((error) => {
-        kokoroPromise = null
-        throw error
-      })
-  }
-
-  return kokoroPromise
-}
-
-/** A voice's style vectors, one 256-float row per utterance length, from the bundled file. */
-function getVoiceStyles(voice) {
-  if (!voiceStyles.has(voice)) {
-    const url = getLocalKokoroVoiceUrl(voice)
-    const styles = url
-      ? fetch(url).then((response) => response.arrayBuffer()).then((buffer) => new Float32Array(buffer))
-      : Promise.reject(new Error(`Voice "${voice}" isn't bundled with Inkblot.`))
-    styles.catch(() => voiceStyles.delete(voice))
-    voiceStyles.set(voice, styles)
-  }
-  return voiceStyles.get(voice)
-}
-
-/**
- * Synthesize `text` with the webview model. The style row is picked by the number of
- * phoneme tokens, without the two padding ids, and capped at the voice file's last row.
- */
-async function generateWebviewKokoroAudio(kokoro, text, { voice, speed }) {
-  const [{ Tensor }, { textToPhonemes }] = await Promise.all([
-    import('@huggingface/transformers'),
-    import('./readAloudVoice'),
-  ])
-  const language = String(voice || 'a').charAt(0) === 'b' ? 'b' : 'a'
-  const phonemes = await textToPhonemes(text, language)
-  const { input_ids: inputIds } = kokoro.tokenizer(phonemes, { truncation: true })
-  const row = Math.min(Math.max(inputIds.dims.at(-1) - 2, 0), 509) * 256
-  const styles = await getVoiceStyles(voice)
-  const { waveform } = await kokoro.model({
-    input_ids: inputIds,
-    style: new Tensor('float32', styles.slice(row, row + 256), [1, 256]),
-    speed: new Tensor('float32', [speed], [1]),
-  })
-
-  return {
-    audio: waveform.data,
-    sampling_rate: 24000,
-    engine: 'kokoro-wasm',
-    graphemes: [],
-    phonemes: [phonemes],
-  }
-}
-
-async function configureTransformersForTauri() {
-  if (transformersConfigured) return
-
-  transformersConfigured = true
-  const { env } = await import('@huggingface/transformers')
-
-  // Tauri/WebKit cache can stall model loads. Direct fetch is easier to reason about.
-  env.useBrowserCache = false
-  env.useCustomCache = false
-  env.useFSCache = false
-  env.allowLocalModels = false
-  env.allowRemoteModels = true
-
-  if (env.backends?.onnx?.wasm) {
-    // Tauri/WebKit can load threaded WASM and then stall during ONNX inference.
-    // Single-threaded WASM is slower, but it avoids the "model loaded, no audio" hang.
-    env.backends.onnx.wasm.numThreads = 1
-    env.backends.onnx.wasm.proxy = false
-  }
-}
-
 function withTimeout(promise, timeoutMs, message, code = '') {
   let timeoutId = null
 
@@ -292,103 +143,85 @@ function withTimeout(promise, timeoutMs, message, code = '') {
   })
 }
 
-export function isKokoroGenerationTimeoutError(error) {
-  return error?.code === KOKORO_GENERATE_TIMEOUT_CODE
-    || String(error?.message || '').includes('Kokoro got stuck while generating audio')
-}
-
-export async function generateReadAloudAudio(text, {
-  voice = DEFAULT_READ_ALOUD_VOICE,
-  speed = 1,
-  onProgress,
-  onPhase,
-} = {}) {
-  try {
-    return await generateNativeKokoroAudio(text, { voice, speed, onPhase })
-  } catch (error) {
-    if (!isTauriInvokeUnavailableError(error)) {
-      throw error
-    }
-  }
-
-  onPhase?.('Preparing Kokoro...')
-  const finalizingTimer = window.setTimeout(() => {
-    onPhase?.('Finalizing Kokoro setup...')
-  }, 1500)
-
-  let kokoro
-  try {
-    kokoro = await getWebviewKokoro(onProgress)
-  } finally {
-    window.clearTimeout(finalizingTimer)
-  }
-
-  onPhase?.('Generating speech...')
-  await yieldToBrowser()
-
-  try {
-    return await withTimeout(
-      generateWebviewKokoroAudio(kokoro, text, { voice, speed }),
-      KOKORO_GENERATE_TIMEOUT_MS,
-      'Kokoro got stuck while generating audio. Switching to the built-in system voice.',
-      KOKORO_GENERATE_TIMEOUT_CODE
-    )
-  } catch (error) {
-    if (isKokoroGenerationTimeoutError(error)) {
-      kokoroPromise = null
-    }
-
-    throw error
-  }
-}
-
-export async function prewarmReadAloud({ voice = DEFAULT_READ_ALOUD_VOICE } = {}) {
-  try {
-    await withTimeout(
-      invoke('prewarm_kokoro_speech', { voice }),
-      NATIVE_KOKORO_PREWARM_TIMEOUT_MS,
-      'Native Kokoro took too long to warm up.'
-    )
-  } catch (error) {
-    if (!isTauriInvokeUnavailableError(error)) {
-      throw error
-    }
-  }
+/** The speech model hasn't been downloaded yet: offer the download. */
+export function isModelNotInstalledError(error) {
+  return String(error?.message || error || '').includes(MODEL_NOT_INSTALLED)
 }
 
 /**
- * The native path: phonemize here, synthesize in Rust.
- *
- * The grapheme-to-phoneme pass runs in the webview (lib/g2p, through
- * lib/readAloudVoice.ts) and only the model runs natively; nothing here needs a
- * subprocess, so the same path can work on iOS.
+ * Read with the system voices instead: there is no native backend here, or it has
+ * stopped answering.
  */
-async function generateNativeKokoroAudio(text, {
+export function shouldUseSystemSpeech(error) {
+  return error?.code === SPEECH_UNAVAILABLE_CODE || error?.code === SPEECH_TIMEOUT_CODE
+}
+
+/** `invoke`, with the missing-backend case turned into `SPEECH_UNAVAILABLE`. */
+async function invokeSpeech(command, args) {
+  try {
+    return await invoke(command, args)
+  } catch (error) {
+    if (!isTauriInvokeUnavailableError(error)) throw error
+    const unavailable = new Error('On-device speech isn’t available here.')
+    unavailable.code = SPEECH_UNAVAILABLE_CODE
+    throw unavailable
+  }
+}
+
+/** Speak `text` in `voice`: Float32 samples and their rate. */
+export async function generateReadAloudAudio(text, {
   voice = DEFAULT_READ_ALOUD_VOICE,
-  speed = 1,
   onPhase,
 } = {}) {
-  onPhase?.('Preparing Kokoro voice...')
-
-  const { textToTokens } = await import('./readAloudVoice')
-  const { phonemes, tokens } = await textToTokens(text, voice)
-
-  onPhase?.('Starting native Kokoro...')
+  onPhase?.('Getting the voice ready…')
 
   const response = await withTimeout(
-    invoke('generate_kokoro_speech', { tokens, voice, speed }),
-    NATIVE_KOKORO_GENERATE_TIMEOUT_MS,
-    'Native Kokoro took too long to generate audio.'
+    invokeSpeech('generate_speech', { text, voice }),
+    SPEECH_GENERATE_TIMEOUT_MS,
+    'Speech took too long. Switching to the system voice.',
+    SPEECH_TIMEOUT_CODE
   )
-
-  onPhase?.('Decoding Kokoro audio...')
 
   return {
     audio: base64ToFloat32Array(response.audioBase64),
     sampling_rate: response.sampleRate || 24000,
-    engine: response.engine || 'kokoro-onnx',
-    graphemes: [],
-    phonemes: [phonemes],
+    engine: response.engine || 'pocket-tts',
+  }
+}
+
+/** Load the model and voice now, so pressing play doesn't wait for it. */
+export async function prewarmReadAloud({ voice = DEFAULT_READ_ALOUD_VOICE } = {}) {
+  await withTimeout(
+    invokeSpeech('prewarm_speech', { voice }),
+    SPEECH_PREWARM_TIMEOUT_MS,
+    'The voice took too long to load.',
+    SPEECH_TIMEOUT_CODE
+  )
+}
+
+/**
+ * `{ installed, missing }` for the speech model. A backend that answers nothing (the
+ * browser's Tauri mock) counts as no backend.
+ */
+export async function getSpeechModelStatus() {
+  const status = await invokeSpeech('speech_model_status')
+  if (status) return status
+  const unavailable = new Error('On-device speech isn’t available here.')
+  unavailable.code = SPEECH_UNAVAILABLE_CODE
+  throw unavailable
+}
+
+/**
+ * Download the speech model and voices, calling `onProgress` with
+ * `{ asset, index, count, received, total }` as each file arrives.
+ */
+export async function downloadSpeechModel(onProgress) {
+  const { listen } = await import('@tauri-apps/api/event')
+  const unlisten = await listen('speech://download', ({ payload }) => onProgress?.(payload))
+  try {
+    return await invokeSpeech('download_speech_model')
+  } finally {
+    unlisten()
   }
 }
 
@@ -410,20 +243,6 @@ function isTauriInvokeUnavailableError(error) {
     || (message.toLowerCase().includes('command') && message.toLowerCase().includes('not found'))
     || message.includes('invoke is not a function')
     || message.includes('window.__TAURI__')
-}
-
-function yieldToBrowser() {
-  return new Promise((resolve) => {
-    window.requestAnimationFrame(() => resolve())
-  })
-}
-
-function getLocalKokoroVoiceUrl(voice) {
-  const matchingEntry = Object.entries(KOKORO_VOICE_ASSETS).find(([filePath]) => (
-    filePath.endsWith(`/${voice}.bin`)
-  ))
-
-  return matchingEntry?.[1] || ''
 }
 
 export function splitReadAloudText(text, maxLength = MAX_READ_ALOUD_CHUNK_LENGTH) {

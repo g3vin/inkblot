@@ -21,6 +21,8 @@
  * embedded capped version history. Folder structure on disk mirrors the file
  * tree in the UI. A `versions:changed` window event fires whenever a document's
  * version list is updated.
+ *
+ * Mirrors: `src-tauri/crates/inkblot-core/src/store/mod.rs`; `npm run parity` asserts they agree.
  */
 import {
   writeTextFile,
@@ -210,6 +212,10 @@ const timelineRangesFor = (docData, existing) => {
  * archive, citations, timeline passages, lock), and add a version when `docData`
  * asks with `_appendVersion`. Refuses any path that is not a text document: a canvas
  * or map written here would be wiped.
+ *
+ * @param {string} projectName
+ * @param {string} docName the tree path, without `.json`
+ * @param {Partial<import('../types').TextDocument> & { _appendVersion?: unknown }} docData
  */
 export async function saveDocument(projectName, docName, docData) {
   if (!isTextDoc(docName)) {
@@ -350,7 +356,12 @@ export async function readFolderLockFlag(projectName, folderPath) {
 }
 
 /**
- * Loads a document from its project's storage location.
+ * Loads a document from its project's storage location: null when there is no such
+ * document or the read failed (logged).
+ * @param {string} projectName
+ * @param {string} docName the tree path, without `.json`
+ * @returns {Promise<(import('../types').TextDocument & { locked?: boolean }) | null>}
+ *   `locked` is the writer's lock (setDocumentLockFlag); the Rust type doesn't model it.
  */
 export async function loadDocument(projectName, docName) {
   try {
@@ -388,6 +399,7 @@ let projectListing = null
 /**
  * Every project's name. Calls made while one listing is in flight share it: opening
  * a project asks from several places at once.
+ * @returns {Promise<string[]>}
  */
 export function listProjects() {
   if (!projectListing) {
@@ -794,7 +806,12 @@ export async function moveEntry(projectName, entryPath, targetFolderPath, type =
   }
 }
 
-/** Read a project's full folder/file tree (dotfiles and the order file excluded). */
+/**
+ * Read a project's full folder/file tree (dotfiles and the order file excluded), as
+ * one folder node for the project itself.
+ * @param {string} projectName
+ * @returns {Promise<import('../types').TreeNode>}
+ */
 export async function listProjectTree(projectName) {
   const root = await getProjectRoot(projectName)
 

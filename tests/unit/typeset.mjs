@@ -144,6 +144,10 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   const alsoByBack = items.insertMatterItem(withAck, { id: 'ab', kind: 'matter', matter: 'alsoBy', hidden: false }, 'back')
   ok('Also By can go either side: asked for at the back, it goes there', alsoByBack.at(-1).id === 'ab')
   ok('moving an entry moves only it', items.moveItem(withAck, 'a', 'k')[0].id === 'a' && items.moveItem(withAck, 'k', null).at(-1).id === 'k')
+  const block = items.moveItems(withAck, ['a', 'g'], 'k')
+  ok('moving several moves them as a block, in the book’s order, wherever they were',
+    block[0].id === 'g' && block[1].id === 'a' && block[2].id === 'k' && block.length === withAck.length)
+  ok('a block can’t go before one of its own', items.moveItems(withAck, ['a', 'k'], 'k') === withAck)
 
   const typed = [
     { id: 'p', kind: 'chapter', path: 'P', chapterType: 'prologue', hidden: false },
@@ -242,6 +246,21 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
     !store.getBookSettings(P, 'Novel').items.some((it) => it.id === about.id) && !(await loadDocument(P, about.path)))
   await contents.removeBookItem(P, 'Novel', 'c:Novel/One')
   ok('a chapter cannot be removed from the book, only hidden', store.getBookSettings(P, 'Novel').items.some((it) => it.id === 'c:Novel/One'))
+
+  // A selection, changed at once: and two edits sent together, which must not undo each other.
+  const byPath = (path) => store.getBookSettings(P, 'Novel').items.find((it) => it.path === path)
+  await Promise.all([
+    contents.setBookItemHidden(P, 'Novel', 'c:Novel/One', true, ['c:Novel/One', 'c:Novel/Two']),
+    contents.moveBookItem(P, 'Novel', 'c:Novel/Three', null, ['c:Novel/Three', 'c:Novel/Two']),
+  ])
+  ok('hiding a selection hides each of them', byPath('Novel/One').hidden && byPath('Novel/Two').hidden)
+  ok('a selection moves as one block, in the book’s order, and the edit sent beside it still holds',
+    store.getBookSettings(P, 'Novel').items.filter((it) => it.kind === 'chapter').map((it) => it.path).join() === 'Novel/One,Novel/Two,Novel/Three')
+  const pages = [await contents.addBookItem(P, 'Novel', { matter: 'preface' }), await contents.addBookItem(P, 'Novel', { matter: 'afterword' })]
+  await contents.removeBookItem(P, 'Novel', pages[0].id, [...pages.map((page) => page.id), 'c:Novel/One'])
+  const left = store.getBookSettings(P, 'Novel').items
+  ok('removing a selection takes its pages and their documents, and skips its chapters',
+    !left.some((it) => pages.some((page) => page.id === it.id)) && !(await loadDocument(P, pages[1].path)) && left.some((it) => it.id === 'c:Novel/One'))
 
   await relocateBooks(P, 'Novel', 'Book', { folder: true })
   const relocated = store.getBookSettings(P, 'Book').items

@@ -13,6 +13,8 @@ import { invoke } from '@tauri-apps/api/core'
 export const HAPTIC_ALIGNMENT = 'alignment'
 /** The heavier one, for a change that actually committed. */
 export const HAPTIC_LEVEL = 'level'
+/** AppKit's generic tap, unlike either: for backing out of a change not yet made. */
+export const HAPTIC_GENERIC = 'generic'
 
 /**
  * Two taps closer together than this are felt as one, so firing them only spends

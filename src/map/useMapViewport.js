@@ -28,6 +28,8 @@ import {
   svgWorldTransform,
   zoomMapAt,
 } from '../lib/map/mapViewport'
+import { trackSample, velocityFrom } from '../ui/physics.js'
+import { coast } from '../ui/useSpring.js'
 
 const WHEEL_ZOOM_SENSITIVITY = 0.01
 /** The most one wheel event zooms by, in px of delta: ×1.22 a mouse notch. */
@@ -37,6 +39,12 @@ export function useMapViewport({ initialViewport, onViewportChange, enabled = tr
   const surfaceRef = useRef(null)
   const worldRef = useRef(null)
   const viewportRef = useRef(initialViewport)
+  /** Stops the coast after a thrown pan; any new touch of the map stops it. */
+  const stopCoastRef = useRef(() => {})
+  useEffect(() => {
+    const coasting = stopCoastRef
+    return () => coasting.current()
+  }, [])
   const frameRef = useRef(0)
   const settleTimerRef = useRef(0)
   const surfaceRectRef = useRef(null)
@@ -149,6 +157,7 @@ export function useMapViewport({ initialViewport, onViewportChange, enabled = tr
     const onWheel = (event) => {
       // Scrolling inside a panel (the inspector, a list) stays a scroll.
       if (event.target.closest?.('[data-map-scrolls]')) return
+      stopCoastRef.current()
       event.preventDefault()
       // deltaMode 1 is lines, 2 is pages — normalize both to pixels.
       const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? surface.clientHeight : 1
@@ -195,17 +204,26 @@ export function useMapViewport({ initialViewport, onViewportChange, enabled = tr
   /** Begin a pan from a pointerdown; returns a function that ends it early. */
   const startPan = useCallback(
     (event) => {
+      stopCoastRef.current()
       let lastX = event.clientX
       let lastY = event.clientY
+      const samples = [{ t: performance.now(), x: lastX, y: lastY }]
       const onMove = (moveEvent) => {
         applyViewport(panMapBy(viewportRef.current, moveEvent.clientX - lastX, moveEvent.clientY - lastY))
         lastX = moveEvent.clientX
         lastY = moveEvent.clientY
+        trackSample(samples, { t: performance.now(), x: lastX, y: lastY })
       }
-      const stop = () => {
+      const stop = (upEvent) => {
         window.removeEventListener('pointermove', onMove)
         window.removeEventListener('pointerup', stop)
         window.removeEventListener('pointercancel', stop)
+        // Let go while moving, the map coasts on: the throw's speed under friction.
+        if (upEvent?.type === 'pointerup') {
+          stopCoastRef.current = coast(velocityFrom(samples), (dx, dy) => {
+            applyViewport(panMapBy(viewportRef.current, dx, dy))
+          })
+        }
       }
       window.addEventListener('pointermove', onMove)
       window.addEventListener('pointerup', stop)

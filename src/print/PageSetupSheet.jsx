@@ -20,6 +20,7 @@ import { BOOK_TYPOGRAPHY } from './typography'
 import { useDocPageSetup } from './useDocPageSetup'
 import { usePrintJobStatus } from './usePrintJobStatus'
 import './PageSetupSheet.css'
+import { EXPORT_EVENT, PRINT_EVENT } from '../lib/appEvents'
 
 const UNIT_KEY = 'inkblot-page-units'
 const defaultUnit = () => {
@@ -205,13 +206,13 @@ export default function PageSetupSheet({ editor, projectName, docPath, pageCount
           ]}
         />
         <div className="pss-action-row">
-          <Button variant="tinted" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:print', { detail: { scope } }))}>Print…</Button>
+          <Button variant="tinted" onClick={() => window.dispatchEvent(new CustomEvent(PRINT_EVENT, { detail: { scope } }))}>Print…</Button>
           <SelectMenu
             label="Export"
             value=""
             onChange={(value) => {
               const [format, bound] = value.split(':')
-              if (format) window.dispatchEvent(new CustomEvent('inkblot:export', { detail: { format, scope, bound: bound === 'bound' } }))
+              if (format) window.dispatchEvent(new CustomEvent(EXPORT_EVENT, { detail: { format, scope, bound: bound === 'bound' } }))
             }}
             options={[{ value: '', label: 'Export…', disabled: true }, ...exportOptions]}
           />

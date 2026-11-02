@@ -18,11 +18,13 @@ import RemindersPane from './RemindersPane.jsx'
 import ShortcutsPane from './ShortcutsPane.jsx'
 import StoryPane from './StoryPane.jsx'
 import MapsPane from './MapsPane.jsx'
+import SelectionWheelPane from './SelectionWheelPane.jsx'
 import './Settings.css'
 
 const PANES = [
   { id: 'general', title: 'General', icon: 'settings' },
   { id: 'writing', title: 'Writing', icon: 'chart' },
+  { id: 'wheel', title: 'Selection wheel', icon: 'highlight' },
   { id: 'goals', title: 'Goals', icon: 'target' },
   { id: 'timers', title: 'Timers', icon: 'timer' },
   { id: 'reminders', title: 'Reminders', icon: 'bell' },
@@ -84,6 +86,7 @@ export default function SettingsSheet({ appearance }) {
     <NavSheet title="Settings" items={PANES} value={pane} onChange={setPane} onClose={() => setOpen(false)} className="settings-sheet">
       {pane === 'general' ? <GeneralPane appearance={appearance} /> : null}
       {pane === 'writing' ? <WritingPane stats={stats} /> : null}
+      {pane === 'wheel' ? <SelectionWheelPane /> : null}
       {pane === 'goals' ? <GoalsPane stats={stats} /> : null}
       {pane === 'timers' ? <TimersPane stats={stats} /> : null}
       {pane === 'reminders' ? <RemindersPane stats={stats} /> : null}

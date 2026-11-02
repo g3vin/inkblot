@@ -11,7 +11,9 @@
   align-items: center;
 }
 
-.toolbar > .tb-slot.is-flexible { flex: 1 1 var(--space-6); min-width: var(--space-3); }
+.tb-page > .tb-slot.is-flexible { flex: 1 1 var(--space-6); min-width: var(--space-3); }
+/* Set aside for an open choice, or a spacer at the edge of a page carried on. */
+.tb-slot[hidden] { display: none; }
 
 .tb-space { display: block; width: var(--space-3); height: 1px; }
 .tb-flexible-space { display: block; width: 100%; height: 1px; }
@@ -165,59 +167,106 @@ body:has(.tb-row.is-removing) .tb-ghost { opacity: 0.5; }
 .tb-timer[data-state='paused'] { color: var(--text-muted); }
 .tb-timer-clock { font: 600 12px var(--font-ui); font-variant-numeric: tabular-nums; min-width: 34px; text-align: left; }
 
-/* ---------------- overflow ---------------- */
+/* ---------------- pages ---------------- */
 
-/* Out of the row's flow, so the row keeps its width, but still measured. */
-.tb-slot[data-overflowed='true'] { position: absolute; visibility: hidden; pointer-events: none; }
-.tb-overflow {
+/* The row is a window onto its pages, side by side on a track that the swipe moves
+   (ToolbarHost). Each page lays its items out as the row used to. */
+.tb-row { gap: 0; padding: 0; overflow: hidden; }
+.tb-row > .tb-viewport { flex: 1 1 auto; min-width: 0; height: 100%; overflow: hidden; }
+.tb-track { display: flex; height: 100%; will-change: transform; }
+.tb-page {
+  box-sizing: border-box;
+  display: flex;
   flex: 0 0 auto;
+  align-items: center;
+  justify-content: safe center;
+  gap: var(--space-2);
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--space-4);
+  overflow: hidden;
+}
+.tb-page > * { flex: 0 0 auto; }
+/* A swipe fades the page it's leaving as far as the fingers have gone (ToolbarHost's
+   --tb-swipe-fade), never quite away. Let go, the page going out stays faint and the one
+   coming in fades up as they slide; mid-swipe the fade follows the fingers exactly. */
+.tb-page { opacity: var(--tb-swipe-floor, 0.25); transition: opacity var(--spring-smooth-dur) var(--spring-smooth); }
+.tb-page[data-current] { opacity: var(--tb-swipe-fade, 1); }
+.tb-track.is-swiping > .tb-page { transition: none; }
+.tb-row.is-customizing .tb-page { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .tb-page { transition: none; }
+}
+/* Customizing, a page shows whole, however long: it scrolls. */
+.tb-row.is-customizing .tb-page { overflow-x: auto; scrollbar-width: none; justify-content: flex-start; }
+.tb-page-empty { font: var(--text-xs) / 1 var(--font-ui); color: var(--text-muted); }
+
+/* The dots: which page shows, and a click away from the others. The pill over the
+   current one follows a swipe (ToolbarHost's --tb-page-progress, in pages, on the
+   swipe's spring: no transition of its own) and springs to its dot when the page turns. */
+.tb-pages {
+  --tb-dot-pitch: var(--space-5);
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none;
+  margin-right: var(--space-3);
+}
+.tb-page-pill {
+  position: absolute;
+  top: calc(50% - 3px);
+  left: calc(var(--tb-page-progress, 0) * var(--tb-dot-pitch) + (var(--tb-dot-pitch) - 14px) / 2);
+  width: 14px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--text-primary);
+  pointer-events: none;
+}
+.tb-page-dot {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: auto;
-  width: var(--size-capsule);
+  width: var(--tb-dot-pitch);
   height: var(--size-capsule);
   padding: 0;
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text-primary);
   cursor: pointer;
 }
-.tb-overflow:hover { background: var(--surface-active); }
-/* », the toolbar's second page: what didn't fit, in place of what did, with ‹ first. */
-.tb-row > .tb-overflow.is-back { margin-left: 0; margin-right: var(--space-2); }
+.tb-page-dot > span {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--text-subtle);
+}
+.tb-page-dot:hover { background: var(--surface-active); }
+.tb-page-dot:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+/* Customizing, a dot takes an item dropped on it. */
+.tb-row.is-customizing .tb-page-dot { outline: 1px dashed var(--border-strong); outline-offset: -2px; }
 
 /* A pop-up from the row opens in the toolbar (Popover.jsx, DESIGN.md §6). Taking the
-   whole toolbar, the row stays mounted, hidden, as it does for find. */
+   whole toolbar (a form, as find), the row stays mounted, hidden. */
 .toolbar-wrapper:has(> .ib-dock[data-mode='whole']) > :not(.ib-dock) { display: none; }
 .toolbar-wrapper > .ib-dock[data-mode='whole'] { margin: 0 auto; }
-/* A narrow card (iPad, both sidebars docked): the controls get the room, not the title. */
-.toolbar-wrapper { container-type: inline-size; }
-@container (max-width: 480px) {
-  .ib-dock[data-mode='whole'] > .ib-dock-eyebrow { display: none; }
-}
-/* In place: beside its item, pushing what follows along (and behind »). */
+/* In place: beside its item, growing open and setting aside what no longer fits. */
 .tb-dock-inline:empty { display: none; }
 .tb-slot:has(> .tb-dock-inline:not(:empty)) { gap: var(--space-1); }
 /* The button it opened from stays pressed. */
 .tb-row [data-opener] { background: var(--accent-surface-strong); color: var(--accent-foreground); }
-/* A button's menu as a row of its items (MenuRow.jsx): words, groups apart. */
-.tb-menu-row { gap: 2px; }
-.tb-menu-row > button { padding: 0 var(--space-3); }
-.tb-menu-row-group { flex: none; margin: 0 var(--space-1); }
-
-/* The More marker: a token while customizing; everything after it goes behind ». */
-.tb-more-marker {
-  display: inline-flex;
-  align-items: center;
-  height: var(--size-capsule);
-  padding: 0 var(--space-3);
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-md);
-  font: var(--weight-medium) var(--text-xs) / 1 var(--font-ui);
-  color: var(--text-muted);
-  white-space: nowrap;
+/* A button's menu as a row of its items (MenuRow.jsx): icons or words, groups apart. */
+.tb-menu-row { gap: 2px; padding: 0; }
+.tb-menu-row > button:has(> .tb-text) { padding: 0 var(--space-3); }
+/* A long row (the fonts, the voices) scrolls within a bound, not the toolbar's width. */
+.tb-strip {
+  position: relative;
+  max-width: min(420px, 45vw);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-.tb-row:not(.is-customizing) .tb-slot:has(> .tb-more-marker) { display: none; }
-
+.tb-strip::-webkit-scrollbar { display: none; }
+/* Each font sits its letters differently in its line box (its own ascent and descent),
+   so a row of them drawn in their faces would wander up and down. Trimmed to the cap
+   height and the baseline, every name's letters centre on the same line. */
+.tb-strip .tb-text,
+.tb-value-font { text-box: trim-both cap alphabetic; }

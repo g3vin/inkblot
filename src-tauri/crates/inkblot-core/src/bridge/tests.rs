@@ -605,10 +605,12 @@ fn every_command() -> Vec<NativeCommand> {
         NativeCommand::MoveBookItem(MoveBookItemCommand {
             id: "c:Novel/One".into(),
             before: Some("d1".into()),
+            ids: vec!["c:Novel/One".into(), "c:Novel/Three".into()],
         }),
         NativeCommand::SetBookItemHidden(SetBookItemHiddenCommand {
             id: "c:Novel/One".into(),
             hidden: true,
+            ids: Vec::new(),
         }),
         NativeCommand::AddBookItem(AddBookItemCommand {
             matter: Some(crate::types::MatterKind::AboutAuthor),
@@ -618,7 +620,10 @@ fn every_command() -> Vec<NativeCommand> {
             title: None,
             back: false,
         }),
-        NativeCommand::RemoveBookItem(RemoveBookItemCommand { id: "d1".into() }),
+        NativeCommand::RemoveBookItem(RemoveBookItemCommand {
+            id: "d1".into(),
+            ids: vec!["d1".into(), "p:2".into()],
+        }),
         NativeCommand::EditBookItem(EditBookItemCommand {
             id: "c:Novel/One".into(),
             title: None,
@@ -1816,6 +1821,21 @@ fn a_page_setup_edit_from_an_older_shell_goes_to_the_document() {
         NativeCommand::SetPageSetup(edit) => assert_eq!(edit.target, PageSetupTarget::Document),
         other => panic!("read as {other:?}"),
     }
+}
+
+#[test]
+fn a_book_entry_command_from_an_older_shell_acts_on_its_one_entry() {
+    let wire = json!({ "type": "setBookItemHidden", "payload": { "id": "d1", "hidden": true } });
+    let command: NativeCommand = serde_json::from_value(wire).unwrap();
+    match &command {
+        NativeCommand::SetBookItemHidden(edit) => assert!(edit.ids.is_empty()),
+        other => panic!("read as {other:?}"),
+    }
+    let text = serde_json::to_string(&command).unwrap();
+    assert!(
+        !text.contains("ids"),
+        "an empty selection is left off the wire: {text}"
+    );
 }
 
 #[test]

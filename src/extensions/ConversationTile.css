@@ -433,9 +433,8 @@
   opacity: 0.24;
   pointer-events: none;
   transform: scale(0.985);
-  transition:
-    opacity 120ms ease,
-    transform 120ms ease;
+  transition: opacity var(--spring-quick-dur) var(--spring-quick),
+    transform var(--spring-quick-dur) var(--spring-quick);
 }
 
 .conversation-drop-slot {
@@ -576,7 +575,7 @@
   margin: 1px 0 3px;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 120ms ease;
+  transition: opacity var(--spring-quick-dur) var(--spring-quick);
 }
 
 .conversation-insert-row.is-outgoing {
@@ -676,7 +675,7 @@
   max-width: 100%;
   margin: 3px 0 7px;
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity var(--spring-quick-dur) var(--spring-quick);
 }
 
 .conversation-message-actions {
@@ -734,9 +733,8 @@
   cursor: grab;
   opacity: 1;
   user-select: none;
-  transition:
-    background 120ms ease,
-    color 120ms ease;
+  transition: background var(--spring-quick-dur) var(--spring-quick),
+    color var(--spring-quick-dur) var(--spring-quick);
 }
 
 .conversation-drag-handle:active {
@@ -803,10 +801,9 @@
   color: inherit;
   pointer-events: none;
   opacity: 0;
-  transition:
-    opacity 120ms ease,
-    background 120ms ease,
-    border-color 120ms ease;
+  transition: opacity var(--spring-quick-dur) var(--spring-quick),
+    background var(--spring-quick-dur) var(--spring-quick),
+    border-color var(--spring-quick-dur) var(--spring-quick);
 }
 
 .conversation-bubble:focus-within .conversation-bubble-attach,

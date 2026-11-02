@@ -6,8 +6,11 @@
  */
 import { createQuoteNote } from '../../lib/noteUtils'
 import { DEFAULT_HIGHLIGHT_COLOR } from '../../lib/palette'
+import { documentSurface } from '../../bridge'
+import { HIDDEN_TEXT } from '../../extensions/HiddenText'
 import { bubbleSessionAt, sessionForms, showSessionForm } from '../../extensions/BubbleSession'
 import { paragraphForBubble, selectionForBubble } from '../useBubbleSessions'
+import { PRINT_LAYOUT_TOGGLE } from '../../lib/appEvents'
 
 /* ------------------------------------------------------------
    Helper: Remove highlight only within selection (native behavior)
@@ -64,7 +67,7 @@ export async function editorMenu(ctx) {
         }),
         await MenuItem.new({
           text: 'Print layout',
-          action: () => window.dispatchEvent(new CustomEvent('inkblot:print-layout-toggle')),
+          action: () => window.dispatchEvent(new CustomEvent(PRINT_LAYOUT_TOGGLE)),
         }),
         await PredefinedMenuItem.new({ item: 'Separator' })
       )
@@ -138,7 +141,7 @@ export async function editorMenu(ctx) {
           action: () => {
             try {
               const highlightColor =
-                editor.storage.lastHighlightColor || DEFAULT_HIGHLIGHT_COLOR
+                documentSurface.lastHighlightColor() || DEFAULT_HIGHLIGHT_COLOR
               editor.chain().focus().setHighlight({ color: highlightColor }).run()
             } catch (err) {
               console.warn('Failed to apply highlight:', err)
@@ -154,6 +157,20 @@ export async function editorMenu(ctx) {
             text: 'Remove highlight',
             action: () => {
               removePartialHighlight(editor)
+            },
+          })
+        )
+      }
+
+      if (editor.state.schema.marks[HIDDEN_TEXT]) {
+        const hidden = editor.isActive(HIDDEN_TEXT)
+        items.push(
+          await MenuItem.new({
+            text: hidden ? 'Show hidden text' : 'Hide',
+            action: () => {
+              const chain = editor.chain().focus()
+              if (hidden) chain.unsetHiddenText().run()
+              else chain.setHiddenText().run()
             },
           })
         )

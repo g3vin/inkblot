@@ -129,7 +129,7 @@
   width: 1px;
   height: 100%;
   background: var(--border-muted);
-  transition: background 120ms ease, width 120ms ease;
+  transition: background var(--spring-quick-dur) var(--spring-quick), width var(--spring-quick-dur) var(--spring-quick);
 }
 
 .vcp-divider:hover .vcp-divider-grip,
@@ -215,7 +215,7 @@
   font-size: 11px;
   padding: 6px 10px;
   cursor: pointer;
-  transition: background 140ms ease;
+  transition: background var(--spring-quick-dur) var(--spring-quick);
 }
 
 .vcp-equal-collapsed:hover {
@@ -266,7 +266,7 @@
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  transition: background var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick), border-color var(--spring-quick-dur) var(--spring-quick);
 }
 
 .vcp-keep:hover:not(.is-on) {

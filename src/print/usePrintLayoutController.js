@@ -91,6 +91,7 @@ import { activeEditionOf, editEditions, isEbookEdition } from './editions'
 import { typesetEntries } from './typesetHistoryStore'
 import { readAnchor, resolveAnchor } from '../bridge/anchors'
 import { actualSizeZoom } from './zoom'
+import { EXPORT_EVENT, IMPORT_SCRIPT, PRINT_EVENT, PRINT_LAYOUT_TOGGLE, WRITING_FORMAT } from '../lib/appEvents'
 
 /** The tokens a running head or foot can hold, for the inspector's token menu. */
 export const RUNNING_TOKENS = [
@@ -572,13 +573,13 @@ export default function usePrintLayoutController({
         if (project) addProjectFont(project, path).then(() => publish()).catch(failed('Adding the font'))
       }),
       // The Book navigator: the book's own order and contents, never the file tree's.
-      documentSurface.onCommand('moveBookItem', ({ id, before }) => {
+      documentSurface.onCommand('moveBookItem', ({ id, before, ids }) => {
         const { project, folder } = currentBook()
-        if (project) moveBookItem(project, folder, id, before).catch(failed('Moving it'))
+        if (project) moveBookItem(project, folder, id, before, ids).catch(failed('Moving it'))
       }),
-      documentSurface.onCommand('setBookItemHidden', ({ id, hidden }) => {
+      documentSurface.onCommand('setBookItemHidden', ({ id, hidden, ids }) => {
         const { project, folder } = currentBook()
-        if (project) setBookItemHidden(project, folder, id, hidden).catch(failed('Hiding it'))
+        if (project) setBookItemHidden(project, folder, id, hidden, ids).catch(failed('Hiding it'))
       }),
       documentSurface.onCommand('addBookItem', (command) => {
         const { project, folder } = currentBook()
@@ -592,9 +593,9 @@ export default function usePrintLayoutController({
           })
           .catch(failed('Adding it'))
       }),
-      documentSurface.onCommand('removeBookItem', ({ id }) => {
+      documentSurface.onCommand('removeBookItem', ({ id, ids }) => {
         const { project, folder } = currentBook()
-        if (project) removeBookItem(project, folder, id).catch(failed('Removing it'))
+        if (project) removeBookItem(project, folder, id, ids).catch(failed('Removing it'))
       }),
       documentSurface.onCommand('editBookItem', (command) => {
         const { project, folder } = currentBook()
@@ -763,7 +764,7 @@ export default function usePrintLayoutController({
         else saveScriptReport({ editor: ed, docPath: path, report }).catch((error) => console.error('[report] failed:', error))
       }),
       // File ▸ Import Fountain Script…: the pane holding the tree does it (EditorLayout).
-      documentSurface.onCommand('importScript', () => window.dispatchEvent(new CustomEvent('inkblot:import-script'))),
+      documentSurface.onCommand('importScript', () => window.dispatchEvent(new CustomEvent(IMPORT_SCRIPT))),
       documentSurface.onCommand('exportAgain', () => {
         const last = getLastExport(stateRef.current.projectName)
         if (last) stateRef.current.onExport?.(last)
@@ -800,15 +801,15 @@ export default function usePrintLayoutController({
     const onWritingFormat = (event) => {
       stateRef.current.activeEditor?.chain().focus().setWritingFormat(event.detail?.format).run()
     }
-    window.addEventListener('inkblot:writing-format', onWritingFormat)
-    window.addEventListener('inkblot:print-layout-toggle', onToggle)
-    window.addEventListener('inkblot:print', onPrintEvent)
-    window.addEventListener('inkblot:export', onExportEvent)
+    window.addEventListener(WRITING_FORMAT, onWritingFormat)
+    window.addEventListener(PRINT_LAYOUT_TOGGLE, onToggle)
+    window.addEventListener(PRINT_EVENT, onPrintEvent)
+    window.addEventListener(EXPORT_EVENT, onExportEvent)
     return () => {
-      window.removeEventListener('inkblot:writing-format', onWritingFormat)
-      window.removeEventListener('inkblot:print-layout-toggle', onToggle)
-      window.removeEventListener('inkblot:print', onPrintEvent)
-      window.removeEventListener('inkblot:export', onExportEvent)
+      window.removeEventListener(WRITING_FORMAT, onWritingFormat)
+      window.removeEventListener(PRINT_LAYOUT_TOGGLE, onToggle)
+      window.removeEventListener(PRINT_EVENT, onPrintEvent)
+      window.removeEventListener(EXPORT_EVENT, onExportEvent)
     }
   }, [togglePrintLayout])
 

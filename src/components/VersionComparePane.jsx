@@ -66,6 +66,7 @@ import Icon from '../ui/Icon.jsx'
 import { Skeleton, SkeletonOverlay, SkeletonRows } from '../ui/Reveal.jsx'
 import { useReveal } from '../ui/revealState.js'
 import './VersionComparePane.css'
+import { VERSIONS_CHANGED } from '../lib/appEvents'
 
 const CURRENT = 'current'
 
@@ -238,8 +239,8 @@ export default function VersionComparePane({
       if (detail.projectName !== projectName || detail.docName !== docName) return
       void refreshVersions()
     }
-    window.addEventListener('versions:changed', handler)
-    return () => window.removeEventListener('versions:changed', handler)
+    window.addEventListener(VERSIONS_CHANGED, handler)
+    return () => window.removeEventListener(VERSIONS_CHANGED, handler)
   }, [docName, projectName, refreshVersions])
 
   useEffect(() => {

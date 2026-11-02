@@ -14,7 +14,7 @@ import {
   isLegacyMatter,
   matterPathFor,
   matterTemplate,
-  moveItem,
+  moveItems,
   newItemId,
   newMatterItem,
   reconcileBookItems,
@@ -51,8 +51,7 @@ const store = (projectName, folder, items) => (
   setBookSettings(projectName, folder, { ...getBookSettings(projectName, folder), items })
 )
 
-/** Change a book's contents with `change`, from what it is now; stores and returns them. */
-export const editBookItems = async (projectName, folder, change) => {
+const applyEdit = async (projectName, folder, change) => {
   const current = await currentBookItems(projectName, folder)
   const items = await materializeMatter(projectName, folder, current)
   const next = (await change(items)) || (items !== current ? items : null)
@@ -61,13 +60,29 @@ export const editBookItems = async (projectName, folder, change) => {
   return next
 }
 
-export const moveBookItem = (projectName, folder, id, before) => (
-  editBookItems(projectName, folder, (items) => moveItem(items, id, before || null))
+let editing = Promise.resolve()
+
+/**
+ * Change a book's contents with `change`, from what it is now; stores and returns them.
+ * One edit at a time: each reads the book across an await, so two at once would both
+ * start from the same contents and the later write would undo the earlier (a selection
+ * gathered and then given a part, say).
+ */
+export const editBookItems = (projectName, folder, change) => {
+  const edit = editing.then(() => applyEdit(projectName, folder, change))
+  editing = edit.catch(() => {})
+  return edit
+}
+
+/** Move `ids` (or just `id`) together, in the book's order, to before `before`. */
+export const moveBookItem = (projectName, folder, id, before, ids) => (
+  editBookItems(projectName, folder, (items) => moveItems(items, ids?.length ? ids : [id], before || null))
 )
 
-export const setBookItemHidden = (projectName, folder, id, hidden) => (
-  editBookItems(projectName, folder, (items) => items.map((it) => (it.id === id ? { ...it, hidden: Boolean(hidden) } : it)))
-)
+export const setBookItemHidden = (projectName, folder, id, hidden, ids) => {
+  const changing = new Set(ids?.length ? ids : [id])
+  return editBookItems(projectName, folder, (items) => items.map((it) => (changing.has(it.id) ? { ...it, hidden: Boolean(hidden) } : it)))
+}
 
 /**
  * Add an entry: a matter page — its document made from its kind's template — a page
@@ -107,15 +122,21 @@ export const addBookItem = async (projectName, folder, { matter, generated, part
   return added
 }
 
-/** Take a matter page, a generated page or a part out; a matter page's document with it. */
-export const removeBookItem = (projectName, folder, id) => (
-  editBookItems(projectName, folder, async (items) => {
-    const item = items.find((it) => it.id === id)
-    if (!item || item.kind === 'chapter') return null
-    if (item.kind === 'matter' && item.path) await deleteEntry(projectName, item.path, 'file')
-    return items.filter((it) => it.id !== id)
+/**
+ * Take matter pages, generated pages or parts out (`ids`, or just `id`); a matter page's
+ * document with it. Chapters are skipped: they are the manuscript's, only hidden.
+ */
+export const removeBookItem = (projectName, folder, id, ids) => {
+  const removing = new Set(ids?.length ? ids : [id])
+  return editBookItems(projectName, folder, async (items) => {
+    const gone = items.filter((it) => removing.has(it.id) && it.kind !== 'chapter')
+    if (!gone.length) return null
+    for (const item of gone) {
+      if (item.kind === 'matter' && item.path) await deleteEntry(projectName, item.path, 'file')
+    }
+    return items.filter((it) => !gone.includes(it))
   })
-)
+}
 
 /** Set an entry's title, chapter type or page options: each one given. */
 export const editBookItem = (projectName, folder, { id, title, chapterType, page }) => (

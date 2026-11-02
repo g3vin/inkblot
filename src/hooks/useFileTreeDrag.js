@@ -5,8 +5,18 @@
  * are not its own DOM (the canvas surface), and Tauri swallows the
  * native drop event, so the drag is tracked with pointer events and hit-tested
  * with document.elementFromPoint.
+ *
+ * A row grabbed out of a multi-selection carries the whole selection
+ * (`manualDragRef.current.entries`): it goes into the tree together, keeping its order,
+ * and never onto the page, whose drops take one document.
+ *
+ * Dropped in the tree, the ghost isn't simply taken away: it springs from under the
+ * hand onto the row's new place, at the speed it was let go, and the row comes back
+ * as it lands.
  */
 import { useCallback, useEffect } from 'react'
+import { SPRINGS, prefersReducedMotion, trackSample, velocityFrom } from '../ui/physics.js'
+import { SpringValue } from '../ui/useSpring.js'
 import { moveEntry } from '../lib/entryOperations'
 import { canvasSurfaceAt, dispatchCanvasDropDoc } from '../canvas/canvasEvents'
 import { dispatchMapDropDoc, mapSurfaceAt } from '../map/mapEvents'
@@ -50,40 +60,40 @@ export function useFileTreeDrag({
   updateOrder,
 }) {
 
-  const moveOrderItem = useCallback((itemId, fromFolder, toFolder, targetIndex) => {
-    updateOrder(orderState => {
-      moveInOrder(orderState, itemId, fromFolder, toFolder, targetIndex)
-      return orderState
-    })
-  }, [updateOrder])
+  // Move entries to a target folder/index, one after another so each lands after the
+  // last: same-folder moves only touch the stored order; cross-folder moves also move
+  // the entry on disk.
+  // Returns where each entry is now.
+  const performMoves = useCallback(async (entries, targetFolder, targetIndex) => {
+    let index = targetIndex
+    let touchedDisk = false
+    const placed = []
+    for (const { path, type } of entries) {
+      if (type === 'folder' && (targetFolder === path || targetFolder.startsWith(`${path}/`))) continue
+      const fromParent = getParentPath(path)
+      let nextPath = path
 
-  // Move an entry to a target folder/index: same-folder moves only touch the
-  // stored order; cross-folder moves also move the entry on disk.
-  const performMove = useCallback(async ({ path, type }, targetFolder, targetIndex) => {
-    const fromParent = getParentPath(path)
-
-    if (type === 'folder' && targetFolder.startsWith(`${path}/`)) return
-
-    let nextPath = path
-
-    // Moving to a different folder - need filesystem operation
-    if (fromParent !== targetFolder) {
-      const moved = await moveEntry(projectName, path, targetFolder, type)
-      if (!moved) {
-        await refreshTree()
-        return
+      if (fromParent !== targetFolder) {
+        touchedDisk = true
+        const moved = await moveEntry(projectName, path, targetFolder, type)
+        if (!moved) continue
+        nextPath = moved
+        if (type === 'folder') {
+          updateOrder(orderState => remapOrderForFolder(orderState, path, nextPath))
+        }
       }
-      nextPath = moved
-      if (type === 'folder') {
-        updateOrder(orderState => remapOrderForFolder(orderState, path, nextPath))
-      }
-      moveOrderItem(`${type}:${nextPath}`, fromParent, targetFolder, targetIndex)
-      await refreshTree()
-    } else {
-      // Same folder reorder - just update the order, no filesystem operation needed
-      moveOrderItem(`${type}:${nextPath}`, fromParent, targetFolder, targetIndex)
+
+      let placedAt = null
+      updateOrder(orderState => {
+        placedAt = moveInOrder(orderState, `${type}:${nextPath}`, fromParent, targetFolder, index)
+        return orderState
+      })
+      if (typeof index === 'number') index = placedAt + 1
+      placed.push(nextPath)
     }
-  }, [projectName, refreshTree, moveOrderItem, updateOrder])
+    if (touchedDisk) await refreshTree()
+    return placed
+  }, [projectName, refreshTree, updateOrder])
 
   const handleDrop = async (event, targetNode, targetParent) => {
     event.preventDefault()
@@ -115,7 +125,7 @@ export function useFileTreeDrag({
         ? (order[targetParent || ''] || []).indexOf(`${targetNode.type}:${targetNode.path}`)
         : undefined)
 
-    await performMove(data, targetFolder, targetIndex)
+    await performMoves([data], targetFolder, targetIndex)
   }
 
   // Hit-test the pointer during a manual drag: hovering a folder's middle
@@ -203,6 +213,45 @@ export function useFileTreeDrag({
     }, SPLIT_DWELL_MS)
   }, [dragInsertRef, dragOverFolderRef, dragPointRef, manualDragRef, setDragInsert, setDragOverFolder, setDragOverPath, setDragPreview])
 
+  /**
+   * Spring the ghost from under the hand onto the row at `path` (or, if it isn't
+   * showing, the folder it went into), then take it away. Its left and top are
+   * written straight to it: framer owns its transform, and React needn't know.
+   */
+  const landGhost = (path, folder, velocity, done) => {
+    const ghost = document.querySelector('.file-tree-drag-ghost')
+    // After the move has been drawn, so the row is in its new place.
+    requestAnimationFrame(() => {
+      const row = document.querySelector(`[data-entry-path="${CSS.escape(path)}"]`)
+        ?? (folder ? document.querySelector(`[data-entry-path="${CSS.escape(folder)}"]`) : null)
+      if (!ghost || !row || prefersReducedMotion()) {
+        done()
+        return
+      }
+      const from = ghost.getBoundingClientRect()
+      let arrived = 0
+      const land = () => { arrived += 1; if (arrived === 2) done() }
+      const axis = (side, speed) => {
+        const value = new SpringValue(from[side], {
+          spring: SPRINGS.momentum,
+          precision: 0.5,
+          onChange: (current) => {
+            ghost.style[side] = `${current}px`
+            // The row is still moving into place as the drop slot closes: follow it.
+            const target = row.getBoundingClientRect()[side]
+            if (Math.abs(target - value.target) > 0.5) value.set(target)
+          },
+          onRest: land,
+        })
+        value.set(row.getBoundingClientRect()[side], { velocity: speed })
+        // Already there, it never sets off, so it never comes to rest either.
+        if (!value.moving) land()
+      }
+      axis('left', velocity.x)
+      axis('top', velocity.y)
+    })
+  }
+
   // Mouse-driven drag & drop (not HTML5 DnD): a drag arms on item mousedown
   // and activates after ~4px of movement, showing a ghost preview; mouseup
   // commits the move.
@@ -213,6 +262,7 @@ export function useFileTreeDrag({
       dragPointRef.current = { x: event.clientX, y: event.clientY }
       const dx = Math.abs(event.clientX - drag.startX)
       const dy = Math.abs(event.clientY - drag.startY)
+      drag.samples = trackSample(drag.samples ?? [], { t: performance.now(), x: event.clientX, y: event.clientY })
       if (!manualDragActiveRef.current) {
         if (dx + dy < 4) return
         manualDragActiveRef.current = true
@@ -226,6 +276,7 @@ export function useFileTreeDrag({
           iconName: drag.iconName,
           iconFilled: drag.iconFilled,
           box: drag.box,
+          ids: drag.entries?.map((entry) => `${entry.type}:${entry.path}`) ?? null,
         })
       }
       setDragPreview((current) => current ? {
@@ -234,7 +285,7 @@ export function useFileTreeDrag({
         y: event.clientY,
       } : current)
       updateManualDrag(event.clientX, event.clientY)
-      updateSplitDrag(drag, event.clientX, event.clientY)
+      if (!drag.entries) updateSplitDrag(drag, event.clientX, event.clientY)
     }
 
     const onUp = async () => {
@@ -251,27 +302,36 @@ export function useFileTreeDrag({
       manualDragActiveRef.current = false
       dragPointRef.current = null
       setIsDragging(false)
-      setDragPreview(null)
-      setDragSourceId(null)
       setDragOverPath(null)
       setDragInsert(null)
       setDragOverFolder(null)
+      const putDown = () => {
+        setDragPreview(null)
+        setDragSourceId(null)
+      }
 
-      if (!didDrag) return
+      if (!didDrag) {
+        putDown()
+        return
+      }
       splitDropTarget()?.clear()
 
       // A drop onto an open canvas adds a card there, and MUST NOT fall through to
-      // performMove — the pointer never left the tree's own drag state, so the tree
+      // performMoves — the pointer never left the tree's own drag state, so the tree
       // still believes it is reordering, and would silently move the document.
       //
       // Canvases are droppable too (they render as a minimap and open on
       // double-click); the surface itself refuses a canvas dropped onto ITSELF.
-      if (point && drag.type === 'file') {
+      if (point && drag.type === 'file' && !drag.entries) {
         // Onto a side of the page: the document in a split there (or the split it
         // opened while held stays).
-        if (splitDropTarget()?.drop(point.x, point.y, drag.path)) return
+        if (splitDropTarget()?.drop(point.x, point.y, drag.path)) {
+          putDown()
+          return
+        }
         const surface = canvasSurfaceAt(point.x, point.y)
         if (surface) {
+          putDown()
           dispatchCanvasDropDoc(surface, {
             path: drag.path,
             clientX: point.x,
@@ -280,9 +340,10 @@ export function useFileTreeDrag({
           return
         }
         // Onto an open map: a pin for a place, a traveler for a character. Same rule —
-        // it must not fall through to performMove.
+        // it must not fall through to performMoves.
         const mapSurface = mapSurfaceAt(point.x, point.y)
         if (mapSurface) {
+          putDown()
           dispatchMapDropDoc(mapSurface, { path: drag.path, clientX: point.x, clientY: point.y })
           return
         }
@@ -290,7 +351,9 @@ export function useFileTreeDrag({
 
       const targetFolder = folder || (insert ? insert.parentPath : getParentPath(drag.path))
       const targetIndex = insert ? insert.index : undefined
-      await performMove({ path: drag.path, type: drag.type }, targetFolder, targetIndex)
+      const placed = await performMoves(drag.entries ?? [{ path: drag.path, type: drag.type }], targetFolder, targetIndex)
+      // Landed in a folder that is closed, the ghost goes into the folder's row.
+      landGhost(placed[0] ?? drag.path, targetFolder, velocityFrom(drag.samples), putDown)
     }
 
     window.addEventListener('mousemove', onMove)
@@ -299,7 +362,7 @@ export function useFileTreeDrag({
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
     }
-  }, [dragInsert, dragOverFolder, performMove, updateManualDrag, updateSplitDrag, dragInsertRef, dragOverFolderRef, dragPointRef, manualDragActiveRef, manualDragRef, setDragInsert, setDragOverFolder, setDragOverPath, setDragPreview, setDragSourceId, setIsDragging])
+  }, [dragInsert, dragOverFolder, performMoves, updateManualDrag, updateSplitDrag, dragInsertRef, dragOverFolderRef, dragPointRef, manualDragActiveRef, manualDragRef, setDragInsert, setDragOverFolder, setDragOverPath, setDragPreview, setDragSourceId, setIsDragging])
 
   return { handleDrop, updateManualDrag }
 }

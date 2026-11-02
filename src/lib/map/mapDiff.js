@@ -14,7 +14,7 @@
  * difference. The timeline IS compared — the day it was left on is saved state, and a
  * comparison that hid it would show two different files as identical.
  *
- * Mirrors `inkblot_core::map::diff`; `npm run parity` asserts the two agree.
+ * Mirrors: `src-tauri/crates/inkblot-core/src/map/diff.rs`; `npm run parity` asserts the two agree.
  */
 
 /**

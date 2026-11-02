@@ -10,6 +10,8 @@
  *
  * Kept free of React and of the filesystem (callers inject `listProjectTree` /
  * `loadDocument`) so the matching rules can be tested directly.
+ *
+ * Mirrors: `src-tauri/crates/inkblot-core/src/search/mod.rs`; `npm run parity` asserts they agree.
  */
 import { getDocDisplayName, getDocKind } from './docKind'
 import { collectCanvasMatches } from './canvasSearch'

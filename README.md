@@ -71,10 +71,13 @@ Step-by-step recipes for each are in [ARCHITECTURE.md → Recipes](ARCHITECTURE.
 
 Run these before every commit. Each catches failures the others can't. CI
 (`.github/workflows/ci.yml`) runs all of them except `npm run test:layout`.
+`npm run check` runs lint, lint:design, typecheck and the tests in one go, and
+`npm run check:rust` runs the Rust checks with parity and types:check. While iterating,
+`npm run affected` prints just the suites and checks your diff needs.
 
 | Command | What it checks | What only it catches |
 |---|---|---|
-| `npm test` | The suites under `tests/unit/`, in jsdom, mounting real components | A component that throws on every render: lint, tsc and the build all pass on it |
+| `npm test` | The suites under `tests/unit/`, in jsdom, mounting real components. `npm test -- <suite>…` runs some; `--verbose` prints every assertion | A component that throws on every render: lint, tsc and the build all pass on it |
 | `npm run lint` | ESLint, including the React Compiler rules. The bar is 0 errors and 0 warnings | A ref written during render |
 | `npm run lint:design` | No new raw colours, fonts, radii or shadows outside `src/styles/tokens.css` (a per-file ratchet; see [docs/DESIGN.md](docs/DESIGN.md#14-guardrails)) | A hard-coded hex that ignores the theme |
 | `npm run typecheck` | `tsc --noEmit` over the TypeScript | |
@@ -95,11 +98,11 @@ dictionary: `INKBLOT_CMUDICT=/path/to/cmudict.dict cargo test -p inkblot-models 
 | `src/` | The app: React components, TipTap extensions, the canvas, the bridge |
 | `src-tauri/src/` | The Tauri app: command registration and thin wrappers |
 | `src-tauri/crates/inkblot-core/` | Domain logic, persistence, search, version history, the bridge protocol |
-| `src-tauri/crates/inkblot-models/` | On-device models: synonyms, rhymes, Kokoro speech, dictation |
+| `src-tauri/crates/inkblot-models/` | On-device models: synonyms, rhymes, Pocket TTS speech, dictation |
 | `tests/unit/` | The jsdom suites (`npm test`) |
 | `tests/parity/` | The JS/Rust differential harness (`npm run parity`) |
 | `tests/layout/` | Print Layout in real WebKit (`npm run test:layout`) |
-| `scripts/` | Type generation, the pronouncing dictionaries (`npm run lexicon`) |
+| `scripts/` | Type generation, the design lint, dev and screenshot tools ([index](scripts/README.md)) |
 
 ## Contributing
 

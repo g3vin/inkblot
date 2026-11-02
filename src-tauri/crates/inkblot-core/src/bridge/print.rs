@@ -168,6 +168,10 @@ pub struct MoveBookItemCommand {
     pub id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// A selection moved as one block, in the book's order (`id` among them). Empty
+    /// moves `id` alone.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ids: Vec<String>,
 }
 
 /// Hide an entry from the Typeset pages, print, export and the continuous document, or
@@ -178,6 +182,9 @@ pub struct MoveBookItemCommand {
 pub struct SetBookItemHiddenCommand {
     pub id: String,
     pub hidden: bool,
+    /// A selection hidden or shown together (`id` among them). Empty changes `id` alone.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ids: Vec<String>,
 }
 
 /// Add a page of front or back matter (a document, made from its kind's template), a
@@ -210,6 +217,10 @@ pub struct AddBookItemCommand {
 #[serde(rename_all = "camelCase")]
 pub struct RemoveBookItemCommand {
     pub id: String,
+    /// A selection removed together (`id` among them); its chapters are skipped. Empty
+    /// removes `id` alone.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ids: Vec<String>,
 }
 
 /// Rename an entry, change what kind of chapter it is, or how its page sits. Each field

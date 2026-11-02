@@ -46,10 +46,10 @@
   height: calc(100% - var(--sidebar-float-inset) * 2);
   margin-block: var(--sidebar-float-inset);
   --sidebar-glide:
-    margin var(--dur-slow) var(--ease-out),
-    transform var(--dur-slow) var(--ease-out),
-    opacity var(--dur-slow) ease,
-    visibility var(--dur-slow);
+    margin var(--spring-smooth-dur) var(--spring-smooth),
+    transform var(--spring-smooth-dur) var(--spring-smooth),
+    opacity var(--spring-smooth-dur) var(--spring-smooth),
+    visibility var(--spring-smooth-dur);
   transition: var(--sidebar-glide);
 }
 
@@ -105,7 +105,7 @@
 @media (prefers-reduced-motion: reduce) {
   .sidebar,
   .sidebar.ib-tray.is-docked.is-gliding {
-    transition: opacity var(--dur-fast) ease, visibility var(--dur-fast);
+    transition: opacity var(--spring-quick-dur) var(--spring-quick), visibility var(--spring-quick-dur) var(--spring-quick);
   }
 }
 
@@ -227,6 +227,30 @@
   margin-left: 0;
 }
 .left-sidebar-footer-slot { display: flex; min-width: 0; }
+
+/* The inspector's foot, the left foot mirrored: the word count, bare text on the
+   tray, then the archive in the outer corner where the left foot has its +. Docked,
+   it sits level with the card's bottom edge, the button at the shell's inset. */
+.right-sidebar-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--inlay-kerf);
+  min-height: var(--size-circle);
+  margin: var(--space-2);
+}
+.right-sidebar.is-docked .right-sidebar-footer {
+  margin-bottom: 0;
+  margin-right: 0;
+}
+.right-sidebar-footer-slot { display: flex; flex: 1 1 auto; min-width: 0; }
+.right-sidebar-archive-button { flex: 0 0 auto; margin-left: auto; }
+/* The archive in the panels' place, inset as a panel page is. */
+.right-sidebar-archive { flex: 1 1 auto; min-height: 0; height: auto; }
+.right-sidebar-footer .word-count {
+  padding: 0;
+  color: var(--text-secondary);
+}
 /* A view's +, bare on the tray (an InlaySlot). The foot holds the margin. */
 .file-tree-footer { flex: 0 0 auto; }
 
@@ -295,3 +319,27 @@
   white-space: nowrap;
 }
 
+
+/* Opened from a sheet on the landing page: as the sheet grows into the card, a docked
+   sidebar slides in from its edge of the window. */
+.editor-page-wrapper[data-arrival] .left-sidebar.is-docked {
+  animation: sidebar-arrive-left var(--spring-smooth-dur) var(--spring-smooth) calc(var(--spring-quick-dur) / 2) both;
+}
+
+.editor-page-wrapper[data-arrival] .right-sidebar.is-docked {
+  animation: sidebar-arrive-right var(--spring-smooth-dur) var(--spring-smooth) calc(var(--spring-quick-dur) / 2) both;
+}
+
+@keyframes sidebar-arrive-left {
+  from {
+    opacity: 0;
+    translate: calc(var(--space-5) * -1) 0;
+  }
+}
+
+@keyframes sidebar-arrive-right {
+  from {
+    opacity: 0;
+    translate: var(--space-5) 0;
+  }
+}

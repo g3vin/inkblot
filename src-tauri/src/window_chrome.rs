@@ -73,7 +73,7 @@ mod macos {
     use std::collections::HashMap;
     use std::ffi::CString;
     use std::ptr::NonNull;
-    use std::sync::Mutex;
+    use std::sync::{Mutex, OnceLock};
 
     #[derive(Clone, Copy)]
     pub struct Placement {
@@ -130,6 +130,9 @@ mod macos {
 
     /// Each window's last placement, by label, and whether it is being watched.
     static PLACEMENTS: Mutex<Option<HashMap<String, (Placement, bool)>>> = Mutex::new(None);
+
+    /// The gap AppKit leaves between the buttons' left edges.
+    static NATIVE_SPACING: OnceLock<f64> = OnceLock::new();
 
     thread_local! {
         // Set while `apply` moves the views, whose own frame changes would call it again.
@@ -295,10 +298,14 @@ mod macos {
         frame.origin.y = window_frame.size.height - height;
         let _: () = msg_send![container, setFrame: frame];
 
-        let spacing = match mini.origin.x - close.origin.x {
-            gap if gap > 0.0 => gap,
+        // Measured once, from AppKit's own layout at the first placement: measured after
+        // that, it is our spacing, and a read taken while AppKit is halfway through a
+        // relayout (one button moved back, the others not) would carry over to every
+        // later placement and leave the buttons overlapping.
+        let spacing = *NATIVE_SPACING.get_or_init(|| match mini.origin.x - close.origin.x {
+            gap if gap >= close.size.width => gap,
             _ => BUTTON_SPACING,
-        };
+        });
         // AppKit's coordinates run up from the bottom; the container is centred on the line.
         let y = (height - close.size.height) / 2.0;
         for (i, &button) in buttons.iter().enumerate() {

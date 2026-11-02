@@ -56,6 +56,21 @@ await act(async () => { rows.find((r) => r.dataset.reorderId === 'ack').click() 
 ok('a click opens the row by command', commands.at(-1)?.type === 'openBookItem' && commands.at(-1).payload.id === 'ack')
 await act(async () => { rows.find((r) => r.dataset.reorderId === 'ch2').querySelector('.book-row-eye').click() })
 ok('the eye shows a hidden row again', commands.at(-1)?.type === 'setBookItemHidden' && commands.at(-1).payload.hidden === false)
+const opened = commands.length
+const rowOf = (id) => [...document.querySelectorAll('.book-row[data-reorder-id]')].find((r) => r.dataset.reorderId === id)
+const chosenIds = () => [...document.querySelectorAll('.book-row[aria-selected="true"]')].map((r) => r.dataset.reorderId).join()
+await act(async () => { rowOf('ded').dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true })) })
+ok('⌘-click adds a row to the open one, and opens nothing', chosenIds() === 'ded,ack' && commands.length === opened)
+await act(async () => { rowOf('ch2').dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true })) })
+ok('⇧-click chooses the run from the last row clicked, in the book’s order', chosenIds() === 'ded,ch1,ch2')
+// The page still has Chapter 1 open: the clicks above asked, and nothing answered.
+await act(async () => { rowOf('ch1').dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true })) })
+ok('the open row, taken out of the selection, is marked apart from it',
+  chosenIds() === 'ded,ch2' && rowOf('ch1').dataset.current === 'true' && rowOf('ch1').getAttribute('aria-selected') === 'false')
+await act(async () => { rowOf('ch2').dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })) })
+ok('Escape lets the selection go, back to the open row', chosenIds() === 'ch1')
+await act(async () => { rowOf('ch1').dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'a', metaKey: true })) })
+ok('⌘A chooses every row', chosenIds() === 'ded,ch1,ch2,ack')
 await act(async () => { document.querySelector('.book-cover-row').click() })
 ok('the cover opens as a row', commands.at(-1)?.payload.id === 'cover')
 

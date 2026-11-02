@@ -55,7 +55,7 @@ const TAURI = path.resolve(HERE, '../../src-tauri')
 
 /* ---------------- build and run the Rust half ---------------- */
 
-const build = spawnSync('cargo', ['build', '-p', 'inkblot-core', '--bin', 'parity'], {
+const build = spawnSync('cargo', ['build', '-q', '-p', 'inkblot-core', '--bin', 'parity'], {
   cwd: TAURI,
   encoding: 'utf8',
   stdio: ['ignore', 'pipe', 'inherit'],

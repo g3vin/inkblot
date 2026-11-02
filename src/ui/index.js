@@ -27,9 +27,16 @@ export { Inlay, InlaySlot } from './Inlay.jsx'
 export { PanelActions, PanelActionsProvider, ScopeMenu, MoreMenu } from './PanelActions.jsx'
 export { default as InkPicker } from './InkPicker.jsx'
 export { default as InkWheel } from './InkWheel.jsx'
+export { default as ToolWheel, ToolWheelPreview } from './ToolWheel.jsx'
 export { default as CommandPalette } from './CommandPalette.jsx'
 export { default as useNativeMenu, popUpMenu, installHelpContextMenu } from './useNativeMenu.js'
 export { default as usePointerReorder, insertionIndex, moveTo } from './usePointerReorder.js'
 export { RevealGate, Skeleton, SkeletonOverlay, SkeletonRows } from './Reveal.jsx'
 export { useRevealGateOpen, useRevealReady, useDelayedFlag, useReveal, useRevealOnChange, staggerStyle } from './revealState.js'
 export { REVEAL } from './motion.js'
+export {
+  SPRINGS, DECELERATION, spring, springAt, settleTime, progressOf, springEasing, toFramer, project, decayAt,
+  nearestTarget, rubberBand, rubberClamp, velocityFrom, trackSample, prefersReducedMotion,
+} from './physics.js'
+export { SpringValue, coast, springLayout, springTiming, springTransition, useSpring } from './useSpring.js'
+export { PaperSheet, PaperPile } from './Paper.jsx'

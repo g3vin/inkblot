@@ -2,8 +2,8 @@
    Word-count badge
    ============================================================ */
 
-/* The pane's bottom row: the word count bottom-left, the detached-window bar or the
-   zoom bar bottom-right. It is level with the file tree's + and filter and the same
+/* The pane's bottom row, bottom-right: the word count while the inspector is hidden
+   (docked, the inspector's foot holds it), and the lock badge. It is level with the file tree's + and filter and the same
    height (--size-circle), so they read as one row along the bottom of the window. The
    filter sits the sidebar's inset (--space-3), its hairline and its footer's margin
    (--space-2) up from the window; the card is --space-3 up, so the row sits the rest. */
@@ -15,17 +15,22 @@
 .pane-status {
   position: absolute;
   bottom: var(--pane-status-bottom);
-  left: var(--space-3);
+  right: var(--space-3);
   z-index: var(--z-chrome);
   display: flex;
+  flex-direction: row-reverse;
   gap: var(--space-3);
   pointer-events: none;
 }
 
-/* Text dissolves under the capsules rather than running into them (DESIGN.md §6). Not
-   in Print layout, whose pages sit on a desk of their own. */
-.pane-bottom-scrim { --scrim-height: 56px; z-index: 4; }
-.pane-scroll.is-print-layout ~ .pane-bottom-scrim { display: none; }
+/* Where the zoom bar or the detached-window bar holds the bottom-right corner, the row
+   goes to the other end. */
+:root.print-layout-active .pane-status,
+:root:has(.detached-window-bar) .pane-status {
+  left: var(--space-3);
+  right: auto;
+  flex-direction: row;
+}
 
 /* A readout capsule (DESIGN.md §9): --size-circle, as tall as the file tree's filter
    and level with it. */
@@ -43,12 +48,12 @@
   pointer-events: none;
 }
 
-/* Side by side, the secondary pane's badge would sit against the divider, in the
-   middle of the window. Send it to the outer edge instead. */
-.split-active:not(.split-rows) .secondary-pane .pane-status {
-  left: auto;
-  right: var(--space-3);
-  flex-direction: row-reverse;
+/* Side by side, the primary pane's row would sit against the divider, in the middle
+   of the window. Send it to the outer edge instead. */
+.split-active:not(.split-rows) .primary-pane .pane-status {
+  left: var(--space-3);
+  right: auto;
+  flex-direction: row;
 }
 
 /* The seam between the panes is the draggable divider, not a pane border. */

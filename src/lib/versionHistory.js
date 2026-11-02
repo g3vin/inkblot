@@ -11,6 +11,8 @@
  *   - merge builders that turn per-chunk / per-card choices into a new document
  *
  * All pure (DOMParser aside) — nothing here touches the filesystem or React.
+ *
+ * Mirrors: `src-tauri/crates/inkblot-core/src/version_history.rs`; `npm run parity` asserts they agree.
  */
 import { countMapWords } from './map/mapModel'
 import { INKS, inkVar } from './palette'

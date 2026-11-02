@@ -1,4 +1,8 @@
-
+/*
+ * SidebarTiles.css — the workbench layout (main column and side sections) and the
+ * sidebar tiles (definitions, synonyms). One section of Editor.css's ordered manifest:
+ * import it only from there.
+ */
 .workbench {
   display: flex;
   flex-direction: column;
@@ -17,7 +21,7 @@
   margin-bottom: 0;
   position: relative;
   box-shadow: none;
-  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  transition: background var(--spring-quick-dur) var(--spring-quick), border-color var(--spring-quick-dur) var(--spring-quick), box-shadow var(--spring-quick-dur) var(--spring-quick);
 }
 
 .tile-header {
@@ -109,26 +113,27 @@
 }
 
 /*
- * Documents scroll under the titlebar. The titlebar clearance moves from the
- * layout (padding on .middle-section) into the scroller's own content padding:
- * the resting position is identical, but once you scroll, text keeps going up
- * past the scroller's top edge and fades out under the titlebar gradient
- * (.app-titlebar::before) — vanishing off the top of the editor.
+ * The scroller starts below the toolbar's bar rather than running up under it:
+ * the bar is opaque, so nothing would show there, and the scrollbar's track would
+ * start behind the toolbar. The clearance is a margin, not padding, so the track
+ * clears it too.
  */
 .main-layout .middle-section {
   padding-top: 0;
 }
 
 .main-layout .pane-scroll {
-  padding-top: var(--app-titlebar-height);
-  /* Programmatic scrolls (jump-to-text, search hits) must land clear of the fade. */
-  scroll-padding-top: calc(var(--app-titlebar-height) + 20px);
+  margin-top: var(--app-titlebar-height);
+  height: calc(100% - var(--app-titlebar-height));
+  /* Programmatic scrolls (jump-to-text, search hits) land a little below the rule. */
+  scroll-padding-top: 20px;
 }
 
-/* Only panes touching the window top scroll under the titlebar; the bottom
-   pane of a row split sits under the divider, not the titlebar. */
+/* Only panes touching the window top sit under the titlebar; the bottom pane of a
+   row split sits under the divider. */
 .main-layout .split-rows .secondary-pane .pane-scroll {
-  padding-top: 0;
+  margin-top: 0;
+  height: 100%;
 }
 
 /* Non-scrolling pane contents need the same titlebar clearance as a

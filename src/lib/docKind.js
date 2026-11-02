@@ -12,6 +12,8 @@
  * The kind is deliberately NOT read from a `type` field inside the file:
  * saveDocument() whitelists the keys it writes, so any such field would be
  * silently dropped.
+ *
+ * Mirrors: `src-tauri/crates/inkblot-core/src/doc_kind.rs`; `npm run parity` asserts they agree.
  */
 
 export const CANVAS_SUFFIX = '.canvas'

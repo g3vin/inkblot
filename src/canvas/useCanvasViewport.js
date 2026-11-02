@@ -18,6 +18,8 @@ import {
   zoomAt,
   zoomTo,
 } from '../lib/canvasGeometry'
+import { trackSample, velocityFrom } from '../ui/physics.js'
+import { coast } from '../ui/useSpring.js'
 
 /** World units. Exported so snap-to-grid lands on the grid the user can see. */
 export const GRID_SIZE = 24
@@ -48,6 +50,12 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
   const worldRef = useRef(null)
   const gridRef = useRef(null)
   const viewportRef = useRef(initialViewport)
+  /** Stops the coast after a thrown pan; any new touch of the view stops it. */
+  const stopCoastRef = useRef(() => {})
+  useEffect(() => {
+    const coasting = stopCoastRef
+    return () => coasting.current()
+  }, [])
   const frameRef = useRef(0)
   const settleTimerRef = useRef(0)
   const surfaceRectRef = useRef(null)
@@ -180,6 +188,7 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
     // preventDefault() inside an onWheel prop is silently ignored and the
     // surrounding pane scrolls instead.
     const onWheel = (event) => {
+      stopCoastRef.current()
       /*
        * The canvas normally swallows every wheel event to pan and zoom, which
        * leaves the contents of a card — a Pinterest board, a long note thread —
@@ -327,6 +336,7 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
     if (!isMiddleButton && !isSpaceDrag && !isFinger) return false
 
     event.preventDefault()
+    stopCoastRef.current()
     if (isFinger && touchPanRef.current) {
       touchPanRef.current()
       return true
@@ -336,6 +346,7 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
     let lastX = event.clientX
     let lastY = event.clientY
     const pointerId = event.pointerId
+    const samples = [{ t: performance.now(), x: lastX, y: lastY }]
 
     const onMove = (moveEvent) => {
       if (isFinger && moveEvent.pointerId !== pointerId) return
@@ -346,6 +357,7 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
       )
       lastX = moveEvent.clientX
       lastY = moveEvent.clientY
+      trackSample(samples, { t: performance.now(), x: lastX, y: lastY })
     }
 
     const onUp = (upEvent) => {
@@ -355,6 +367,12 @@ export function useCanvasViewport({ initialViewport, onViewportChange, lockedRef
       window.removeEventListener('pointercancel', onUp, true)
       if (touchPanRef.current === end) touchPanRef.current = null
       setIsPanning(false)
+      // Let go while moving, the canvas coasts on: the throw's speed under friction.
+      if (upEvent?.type === 'pointerup') {
+        stopCoastRef.current = coast(velocityFrom(samples), (dx, dy) => {
+          applyViewport(panBy(viewportRef.current, -dx, -dy))
+        })
+      }
     }
     const end = () => onUp()
     if (isFinger) touchPanRef.current = end

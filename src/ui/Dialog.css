@@ -8,7 +8,7 @@
   align-items: center;
   justify-content: center;
   background: var(--scrim-bg);
-  animation: ib-fade-in var(--dur-base) var(--ease-out);
+  animation: ib-fade-in var(--spring-smooth-dur) var(--spring-smooth);
 }
 
 /* Dropped from under the titlebar, which stays uncovered and live. */
@@ -30,9 +30,9 @@
   color: var(--text-primary);
   font-family: var(--font-ui);
   outline: none;
-  animation: ib-dialog-in var(--dur-slow) var(--ease-out);
+  animation: ib-dialog-in var(--spring-smooth-dur) var(--spring-smooth);
 }
-.ib-dialog--small { width: var(--dialog-sm); animation-duration: var(--dur-base); }
+.ib-dialog--small { width: var(--dialog-sm); animation-duration: var(--spring-smooth-dur); }
 .ib-dialog--medium { width: var(--dialog-md); }
 .ib-dialog--large { width: var(--dialog-lg); }
 
@@ -92,9 +92,9 @@
 /* Leaving, the way it came: quicker, easing in (useExitAnimation adds the class). */
 .ib-dialog-scrim.is-leaving {
   pointer-events: none;
-  animation: ib-fade-out var(--dur-fast) var(--ease-in) forwards;
+  animation: ib-fade-out var(--spring-exit-dur) var(--spring-exit) forwards;
 }
-.ib-dialog-scrim.is-leaving .ib-dialog { animation: ib-dialog-out var(--dur-fast) var(--ease-in) forwards; }
+.ib-dialog-scrim.is-leaving .ib-dialog { animation: ib-dialog-out var(--spring-exit-dur) var(--spring-exit) forwards; }
 .ib-dialog-scrim.is-leaving[data-placement='top'] .ib-dialog { animation-name: ib-dialog-rise; }
 
 @keyframes ib-fade-in {

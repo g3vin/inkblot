@@ -1,3 +1,4 @@
+/* HelpSheet.css — a help topic's body and its related-topic links in the help sheet. */
 .help-topic { display: flex; flex-direction: column; gap: var(--space-3); max-width: 60ch; }
 .help-topic .ib-eyebrow { margin: 0; }
 .help-topic-title { margin: 0 0 var(--space-1); }

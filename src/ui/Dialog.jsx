@@ -16,7 +16,7 @@
  *   unit, a reset) goes before a `<span className="ib-dialog-footer-spacer" />`. In a
  *   small dialog, a footer of exactly two buttons shares the width between them.
  * - Size: `small` (400), `medium` (560) or `large` (720).
- * - Motion: it fades in on `--z-dialog` (medium and large over `--dur-slow`) and leaves
+ * - Motion: it fades in on `--z-dialog` (on `--spring-smooth`) and leaves
  *   the way it came.
  * - Focus: the first control inside, never the ×; Tab stays in; the app behind is inert;
  *   focus goes back where it was. `placement="top"` drops it from under the titlebar and

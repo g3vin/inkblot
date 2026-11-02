@@ -18,6 +18,7 @@ import IconButton from '../../ui/IconButton.jsx'
 import Section from '../../ui/Section.jsx'
 import { EmptyState } from '../../ui/Surfaces.jsx'
 import { useClipboardPieceDrag } from './useClipboardPieceDrag'
+import { EDITOR_SELECTION_DRAGEND } from '../../lib/appEvents'
 
 const formatTimestamp = (iso) => {
   if (!iso) return ''
@@ -231,14 +232,14 @@ export default function ClipboardPanel({ entries = [], query = '', onDropToClipb
     window.addEventListener('dragover', onWindowDragOver, true)
     window.addEventListener('drop', onWindowDrop, true)
     window.addEventListener('dragend', onWindowDragEnd, true)
-    window.addEventListener('inkblot:editor-selection-dragend', onEditorSelectionDragEnd)
+    window.addEventListener(EDITOR_SELECTION_DRAGEND, onEditorSelectionDragEnd)
 
     return () => {
       window.removeEventListener('drag', onWindowDrag, true)
       window.removeEventListener('dragover', onWindowDragOver, true)
       window.removeEventListener('drop', onWindowDrop, true)
       window.removeEventListener('dragend', onWindowDragEnd, true)
-      window.removeEventListener('inkblot:editor-selection-dragend', onEditorSelectionDragEnd)
+      window.removeEventListener(EDITOR_SELECTION_DRAGEND, onEditorSelectionDragEnd)
     }
   // Drag handlers intentionally read live window DnD state at event time.
   // eslint-disable-next-line react-hooks/exhaustive-deps

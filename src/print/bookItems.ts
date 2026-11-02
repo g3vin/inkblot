@@ -306,12 +306,21 @@ export const newMatterItem = (
   : { id, kind: BookItemKind.Matter, matter: kind.matter, path: matterPathFor(folder, kind.matter as MatterKind, id), hidden: false })
 
 /** Move the item `id` to before the item `before` (or last), in a new list. */
-export const moveItem = (items: BookItem[], id: string, before: string | null): BookItem[] => {
-  const item = items.find((it) => it.id === id)
-  if (!item || id === before) return items
-  const rest = items.filter((it) => it.id !== id)
+export const moveItem = (items: BookItem[], id: string, before: string | null): BookItem[] => (
+  moveItems(items, [id], before)
+)
+
+/**
+ * Move the items `ids` together, in the book's order, to before the item `before` (or
+ * last), in a new list. `before` is never one of them: a block can't go before itself.
+ */
+export const moveItems = (items: BookItem[], ids: string[], before: string | null): BookItem[] => {
+  const moving = new Set(ids)
+  const block = items.filter((it) => moving.has(it.id))
+  if (!block.length || (before && moving.has(before))) return items
+  const rest = items.filter((it) => !moving.has(it.id))
   const at = before ? rest.findIndex((it) => it.id === before) : -1
-  return at < 0 ? [...rest, item] : [...rest.slice(0, at), item, ...rest.slice(at)]
+  return at < 0 ? [...rest, ...block] : [...rest.slice(0, at), ...block, ...rest.slice(at)]
 }
 
 /* ---------------- templates ---------------- */

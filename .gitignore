@@ -40,3 +40,7 @@ showcase/.tmp/
 
 # Design review screenshots (reproducible from the sha in docs/design-review/state.md)
 design-review/out/
+
+# Local research notes, kept out of the repo and out of code search
+/reports/
+/research_notes/

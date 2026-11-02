@@ -28,8 +28,8 @@
 }
 
 /* The toolbar's bar: the card's own paper, ruled off from the document by a hairline
-   the full width of the card, as Dia's address bar is. Editor content scrolls UNDER
-   it (the .pane-scroll padding swap in SidebarTiles.css). Nothing below the rule: a
+   the full width of the card, as Dia's address bar is. The editor's scroller starts
+   below it (SidebarTiles.css). Nothing below the rule: a
    fade there read as a shadow, worst over Print layout's darker desk. */
 .app-titlebar::before {
   content: '';
@@ -123,9 +123,8 @@
   border-radius: var(--radius-lg);
   /* No border: the card stands off the tray by its shadow alone. */
   box-shadow: var(--shadow-card);
-  transition:
-    margin-left var(--dur-slow) var(--ease-out),
-    margin-right var(--dur-slow) var(--ease-out);
+  transition: margin-left var(--spring-smooth-dur) var(--spring-smooth),
+    margin-right var(--spring-smooth-dur) var(--spring-smooth);
 }
 
 /* Split view: the card steps back to a frame holding three cards of its own: the
@@ -173,18 +172,17 @@
    lets it glide back out. One pinned from hidden glides in with the card. */
 .document-card.has-left-dock {
   margin-left: 0;
-  transition: margin-right var(--dur-slow) var(--ease-out);
+  transition: margin-right var(--spring-smooth-dur) var(--spring-smooth);
 }
 .document-card.has-right-dock {
   margin-right: 0;
-  transition: margin-left var(--dur-slow) var(--ease-out);
+  transition: margin-left var(--spring-smooth-dur) var(--spring-smooth);
 }
 .document-card.has-left-dock.has-right-dock { transition: none; }
 .document-card.has-left-dock.is-left-gliding,
 .document-card.has-right-dock.is-right-gliding {
-  transition:
-    margin-left var(--dur-slow) var(--ease-out),
-    margin-right var(--dur-slow) var(--ease-out);
+  transition: margin-left var(--spring-smooth-dur) var(--spring-smooth),
+    margin-right var(--spring-smooth-dur) var(--spring-smooth);
 }
 
 .is-sidebar-resizing .document-card { transition: none; }
@@ -195,8 +193,21 @@
 
 /* Focus mode's own bar (FocusModeBar) floats in where the toolbar was. The sidebars stay:
    put away as it opens, they hover in from the edges and can be docked as ever. */
-.editor-page-wrapper.is-focus-mode .app-titlebar {
+.editor-page-wrapper.is-focus-mode:not(.is-leaving-focus-mode) .app-titlebar {
   display: none;
+}
+
+/* Back as focus mode zooms onto the page. */
+.editor-page-wrapper.is-leaving-focus-mode .app-titlebar {
+  animation: focus-mode-titlebar-in var(--spring-gentle-dur) var(--spring-gentle) both;
+}
+
+@keyframes focus-mode-titlebar-in {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-page-wrapper.is-leaving-focus-mode .app-titlebar { animation: none; }
 }
 
 .editor-page-wrapper.is-focus-mode .main-layout {
@@ -221,3 +232,14 @@
 .titlebar-toggle .is-mirrored .ui-icon-button-icon { transform: scaleX(-1); }
 .titlebar-toggle .ui-button { color: var(--text-secondary); }
 .titlebar-toggle .ui-button:hover { color: var(--text-primary); }
+
+/* Opened from a sheet on the landing page (landing/SheetFlight): the card waits under
+   the flight until the sheet lands on it, and its words then appear where the flight's
+   were, without the usual rise. */
+.editor-page-wrapper[data-arrival='flight'] .document-card {
+  visibility: hidden;
+}
+
+.editor-page-wrapper[data-arrival] .document-card {
+  --reveal-rise: 0px;
+}

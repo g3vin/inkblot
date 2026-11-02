@@ -10,7 +10,7 @@ done; the history is in git and [CHANGELOG.md](../CHANGELOG.md).
   icons came from the macOS source (an inset tile), so revisit them if Android ships.
 - **Traffic lights on a real Mac.** Check they appear in place at launch, line up with
   the project name, hide with the sidebar, show on the hovering sidebar, and hold
-  after a resize and fullscreen (`lib/trafficLights.js`,
+  after a resize and fullscreen (`src/lib/trafficLights.js`,
   `src-tauri/src/window_chrome.rs`).
 - **Other settings panes.** Writing, Goals, Timers and Reminders still carry
   paragraph hints (`.settings-footer`); move them into help topics (`src/lib/help.ts`).
@@ -21,29 +21,8 @@ done; the history is in git and [CHANGELOG.md](../CHANGELOG.md).
 
 ## Regenerating the logo
 
-The design is in DESIGN.md §2. `docs/brand/generator/` builds it: `splash.py` models
-the ink impact, and `generate.py` sets the letters from the font outlines, swaps each
-*i*'s dot for the splash, and writes `src/ui/brandPaths.js`, `src/assets/brand/*.svg`
-and `public/favicon.svg`.
-
-Its settings are decisions from the brand review, so change them only on purpose:
-
-- `MARK`: the splash is large and close to the stem (`dot_width` 360, `dot_gap` 40).
-  The monogram keeps its tight *i*–*b* spacing (`kern` −40), and the splash moves left
-  (`dot_dx` −45) to clear the *b*; widening the spacing loosened the monogram.
-- `WORDMARK_DOT`: `dot_width` 330, `dot_gap` 55. The splash adds height, so a
-  `Wordmark` is sized about 1.3× the height its letters alone would need.
-- `ICON_SIZE`, `ICON_CENTRE`: the mark fills 41 of the 64-unit tile, and the point
-  halfway between the ink's box centre and its centre of weight sits at (32, 31.6).
-
-After a change:
-
-1. Run `generate.py`.
-2. Rasterise `app-icon.svg` into the two 1024px sources in `src-tauri/icons/source/`:
-   `icon-macos-1024.png`, inset 100px with corners at 0.225 of the tile and
-   transparent around it, and `icon-ios-1024.png`, full-bleed and opaque. Use
-   `rsvg-convert` (librsvg) or a headless browser screenshot.
-3. Run `npx tauri icon` on each, and copy `ios/` from the iOS run.
+The settings and steps are in [docs/brand/generator/README.md](brand/generator/README.md).
+Its settings are decisions from the brand review, so change them only on purpose.
 
 ---
 
@@ -70,9 +49,9 @@ After a change:
 - **A button's menu is in the page now, so a test can click it** (`.ib-menu`), but a
   right-click's is still the OS's: in the mock it's recorded in `window.__ibMenus`, and in
   a plain browser it does nothing.
-- **A closing dialog, popover or menu leaves a copy behind for `--dur-fast`.**
+- **A closing dialog, popover or menu leaves a copy behind for `--spring-exit-dur`.**
   `useExitAnimation` clones it to play the exit; the copy has no `role` or ids, is inert,
-  has `.is-leaving` and goes in about 120ms. Query by role, or by
+  has `.is-leaving` and goes in about 190ms. Query by role, or by
   `.ib-popover:not(.is-leaving)`, if it matters whether it's still open. There is no copy
   under reduced motion; tests that stub `matchMedia` get one.
 - **A pop-up opened from inside a dialog renders in the dialog's layer.** `Dialog`
@@ -104,19 +83,9 @@ After a change:
 
 ## Checking your work
 
-```bash
-npm run lint && npm run lint:design && npm run typecheck && npm test && npm run build
-```
-
-To look at the real app headlessly (welcome window → editor, or the showcase):
-
-```bash
-npm i --no-save playwright-core
-npm run dev &
-CHROMIUM=/path/to/chromium node scripts/dev/screenshot.mjs /tmp/shot dark
-node scripts/dev/screenshot.mjs /tmp/shot light --design
-node scripts/dev/audit.mjs /tmp/audit dark      # every surface and inspector tab
-```
+Run `npm run check`, then `npm run build`. To look at the app or the showcase in a
+browser, in both themes, use the run-app skill (`.claude/skills/run-app/SKILL.md`). Write
+screenshots to a scratch directory, never into the repo.
 
 For the design review (`docs/design-review/`), `capture.mjs` shoots every surface in
 `design-review/surfaces.json` in both themes at desktop and iPad sizes, and

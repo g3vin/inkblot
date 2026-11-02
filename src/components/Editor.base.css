@@ -1,4 +1,8 @@
-
+/*
+ * Editor.base.css — the writing surface's base: the .tiptap typeface, the page wrapper,
+ * hanging margins and the dictation draft. One section of Editor.css's ordered
+ * manifest: import it only from there.
+ */
 .tiptap {
   /* A document's text is set in the book face; the chrome around it is the UI face. */
   font-family: var(--editor-font-family, var(--font-editor));
@@ -33,7 +37,7 @@
 
 .dictation-inline-finalizing {
   border-radius: 0.24em;
-  animation: dictation-inline-finalize 520ms ease-out forwards;
+  animation: dictation-inline-finalize var(--spring-gentle-dur) var(--spring-gentle) forwards;
 }
 
 /* Two identical sets. DictationInline alternates between them so re-applying

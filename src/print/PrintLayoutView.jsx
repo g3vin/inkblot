@@ -34,11 +34,15 @@ import { clampZoom, fitPageZoom, fitWidthZoom, MAX_ZOOM, MIN_ZOOM, snapToDeviceP
 import { PAGE_GAP } from './printLayoutConstants'
 import { setCurrentPrintPage } from './printLayoutStore'
 import TypesetOverlay from './TypesetOverlay'
-import { Icon } from '../ui'
+import { Icon, SPRINGS, prefersReducedMotion, spring, springAt } from '../ui'
 import { notesBySlot, pageNotesOf } from './notes'
 import { bleedPicturesOf } from './bleed'
 import './PrintLayout.css'
 import './PrintTypography.css'
+import { PAGE_SETUP } from '../lib/appEvents'
+
+/** A zoom to a set level: quick, as a step should be. */
+const ZOOM_SPRING = spring(SPRINGS.quick)
 
 const EMPTY_RESULT = { pageCount: 1, slotCount: 1, slotStarts: [0], chapterStartSlots: [0], pushes: [] }
 
@@ -387,6 +391,9 @@ export default function PrintLayoutView({
       onZoomChange?.(clampZoom(next))
       return
     }
+    // A step pressed mid-zoom carries on from the zoom's current speed.
+    const running = animationRef.current.spring
+    const velocity = running ? springAt(ZOOM_SPRING, running.from, running.to, running.velocity, performance.now() - running.start).velocity : 0
     stopAnimation()
     window.clearTimeout(commitTimerRef.current)
     const rect = scrollEl.getBoundingClientRect()
@@ -398,21 +405,21 @@ export default function PrintLayoutView({
       commitZoom()
       return
     }
-    const start = performance.now()
-    const duration = 220
-    const step = (now) => {
-      const t = Math.min(1, (now - start) / duration)
-      const eased = 1 - (1 - t) ** 3
-      // Geometric, so every frame of the ease is the same proportion of zoom.
-      zoomVisual(from * (to / from) ** eased, ax, ay)
-      if (t < 1) {
+    // On the logarithm of the zoom, so every frame is the same proportion of zoom.
+    const motion = { from: Math.log(from), to: Math.log(to), velocity, start: performance.now() }
+    const step = () => {
+      const state = springAt(ZOOM_SPRING, motion.from, motion.to, motion.velocity, performance.now() - motion.start)
+      const arrived = Math.abs(state.value - motion.to) < 1e-4 && Math.abs(state.velocity) * 16 < 1e-4
+      zoomVisual(arrived ? to : Math.exp(state.value), ax, ay)
+      if (!arrived && !prefersReducedMotion()) {
         animationRef.current.frame = requestAnimationFrame(step)
       } else {
+        if (!arrived) zoomVisual(to, ax, ay)
         animationRef.current = { frame: 0, target: null }
         commitZoom()
       }
     }
-    animationRef.current = { frame: requestAnimationFrame(step), target: to }
+    animationRef.current = { frame: requestAnimationFrame(step), target: to, spring: motion }
   }, [commitZoom, onZoomChange, scrollEl, zoomVisual])
 
   /** The level a step in or out goes to — from where a running step is headed, so
@@ -585,7 +592,7 @@ export default function PrintLayoutView({
         </select>
       </span>
       <button type="button" onClick={() => stepZoom(1)} aria-label="Zoom in" title="Zoom in (⌘+)">+</button>
-      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('inkblot:page-setup'))} aria-label="Page setup" title="Page setup"><Icon name="settings" /></button>
+      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent(PAGE_SETUP))} aria-label="Page setup" title="Page setup"><Icon name="settings" /></button>
     </div>
   )
   const pageCountHost = statusHost?.querySelector(':scope > .pane-status') || null

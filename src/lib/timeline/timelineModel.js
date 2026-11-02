@@ -234,6 +234,10 @@ function withUniqueIds(items, nextId) {
  * Anything → a chronology. Unknown keys survive (a newer Inkblot's fields are kept),
  * dangling lane and tag ids are dropped, and every event comes out with a unique key:
  * one missing or repeated is given a fresh key after the ones already in order.
+ *
+ * @param {unknown} raw
+ * @param {() => string} [nextId]
+ * @returns {import('../../types').StoryTimeline}
  */
 export function normalizeTimeline(raw, nextId = newId) {
   const source = isObject(raw) ? raw : {}
@@ -262,8 +266,10 @@ export const createEmptyTimeline = () => normalizeTimeline({})
 /* ---------------- reading the sequence ---------------- */
 
 /** Events in sequence: by key. */
+/** @type {(timeline: import('../../types').StoryTimeline) => import('../../types').TimelineEvent[]} */
 export const sortedEvents = (timeline) => [...timeline.events].sort((a, b) => compareKeys(a.order, b.order))
 
+/** @type {(timeline: import('../../types').StoryTimeline, id: string) => import('../../types').TimelineEvent | null} */
 export const eventById = (timeline, id) => timeline.events.find((event) => event.id === id) || null
 
 export const isDated = (event) => event.start !== null
@@ -598,6 +604,10 @@ export const TIMELINE_VIEW_TYPE = 'timeline-view'
  */
 export const TIMELINE_SCALES = ['time', 'sequence', 'manuscript']
 
+/**
+ * @param {unknown} raw
+ * @returns {import('../../types').TimelineViewFile}
+ */
 export function normalizeTimelineView(raw) {
   const source = isObject(raw) ? raw : {}
   const filter = isObject(source.filter) ? source.filter : {}

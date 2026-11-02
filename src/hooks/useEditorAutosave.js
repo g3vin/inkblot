@@ -24,6 +24,7 @@ import { isEditorReady } from '../lib/editorUtils'
 import { isTextDoc } from '../lib/docKind'
 import { TYPESET_META } from '../print/TypesetLock'
 import { readEditorTimelineRanges } from '../extensions/TimelineAnchors'
+import { excerptOfNode, noteExcerpt } from '../lib/docExcerpts'
 
 const AUTOSAVE_DEBOUNCE_MS = 800
 const HISTORY_CHECKPOINT_DEBOUNCE_MS = 15000
@@ -119,6 +120,8 @@ export function useEditorAutosave({
         notes: getNotesForDoc(currentDoc),
         timeline: readEditorTimelineRanges(editor, currentDoc),
       })
+      // What the landing page's pile shows of it (lib/docExcerpts.js).
+      noteExcerpt(projectName, currentDoc, excerptOfNode(editor.state.doc))
 
     }, AUTOSAVE_DEBOUNCE_MS)
 
@@ -178,6 +181,7 @@ export function useEditorAutosave({
         notes: getNotesForDoc(secondaryDoc),
         timeline: readEditorTimelineRanges(secondaryEditor, secondaryDoc),
       })
+      noteExcerpt(projectName, secondaryDoc, excerptOfNode(secondaryEditor.state.doc))
     }, AUTOSAVE_DEBOUNCE_MS)
 
     const handleUpdate = () => {

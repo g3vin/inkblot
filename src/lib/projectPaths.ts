@@ -4,6 +4,8 @@
  * Split out of FileSystem.js so versionStore.js can resolve paths without
  * importing the document layer, which imports versionStore in turn. Everything
  * here is path arithmetic plus the one lookup in projectLocations.
+ *
+ * Mirrors: `src-tauri/crates/inkblot-core/src/store/paths.rs`; `npm run parity` asserts they agree.
  */
 import { appDataDir } from '@tauri-apps/api/path'
 import { getProjectLocation } from './projectLocations'

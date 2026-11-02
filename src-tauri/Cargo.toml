@@ -50,7 +50,7 @@ tauri-build = { version = "2.5.4", features = [] }
 [dependencies]
 serde_json = { workspace = true }
 inkblot-core = { path = "crates/inkblot-core" }
-# The synonym model, Kokoro, whisper dictation and the scrape channel. The
+# The synonym model, Pocket TTS, whisper dictation and the scrape channel. The
 # `*_commands.rs` modules are the Tauri glue over it.
 inkblot-models = { path = "crates/inkblot-models", features = ["metal"] }
 url = { workspace = true }

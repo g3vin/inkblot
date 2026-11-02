@@ -17,6 +17,12 @@ import { flushSync } from 'react-dom'
 import { centralAngle } from '../lib/map/geodesy'
 import { unwrapLongitudes } from '../lib/map/globeFeatures'
 import { ITEM_LAYERS } from '../lib/map/globeStyle'
+import { SPRINGS, prefersReducedMotion, progressOf } from '../ui/physics.js'
+
+// maplibre's camera moves take a duration and an easing: the springs' own, from rest.
+const STEP = progressOf(SPRINGS.smooth)
+const CARRY = progressOf(SPRINGS.gentle)
+const springMove = ({ duration, at }) => ({ duration, easing: (t) => at(t * duration) })
 
 const IDENTITY = Object.freeze({ x: 0, y: 0, zoom: 1 })
 /** A point this far round from the centre is over the horizon. */
@@ -130,8 +136,8 @@ export function useGlobeView({ surfaceRef, initialCamera, onCameraChange, enable
   const screenToWorldAt = toSurfacePoint
 
   const ease = useCallback((options) => {
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    glRef.current?.[reduce ? 'jumpTo' : 'easeTo']({ ...options, duration: reduce ? 0 : 500 })
+    if (prefersReducedMotion()) glRef.current?.jumpTo({ ...options, duration: 0 })
+    else glRef.current?.easeTo({ ...options, ...springMove(STEP) })
   }, [])
 
   const zoomIn = useCallback(() => ease({ zoom: (glRef.current?.getZoom() || 0) + 1 }), [ease])
@@ -154,7 +160,7 @@ export function useGlobeView({ surfaceRef, initialCamera, onCameraChange, enable
       ease({ center: bounds[0], zoom: Math.max(gl.getZoom(), 6) })
       return
     }
-    gl.fitBounds(bounds, { padding: 80, maxZoom: 12, duration: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 700 })
+    gl.fitBounds(bounds, { padding: 80, maxZoom: 12, ...(prefersReducedMotion() ? { duration: 0 } : springMove(CARRY)) })
   }, [ease])
 
   const centerOnStored = useCallback((point) => {

@@ -19,19 +19,17 @@ import { sidebarTabsFor } from './sidebarTabsConfig'
 import useInspectorLayout from './useInspectorLayout'
 import './InspectorLayout.css'
 import { useLatestBridgeState } from '../../bridge'
-import { isMapDoc } from '../../lib/docKind'
+import { isMapDoc, isTextDoc } from '../../lib/docKind'
 import { inspectorTab } from '../../lib/chromeLayout'
 import Workbench from './Workbench'
 import NotesPanel from '../NotesPanel'
 import HistoryPanel from './HistoryPanel'
 import TimelineSidebarPanel from '../../timeline/TimelineSidebarPanel'
 import ClipboardPanel from './ClipboardPanel'
+import ArchivePanel from './ArchivePanel'
+import { IconButton, Inlay, InlaySlot } from '../../ui'
 import Icon from '../../ui/Icon.jsx'
 import { PanelActions, PanelActionsProvider, ScopeMenu } from '../../ui/PanelActions.jsx'
-
-/** How the panels glide to rest once a swipe lets go, or a tab is clicked. */
-const SNAP_DURATION_MS = 260
-const SNAP_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)'
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
@@ -45,6 +43,7 @@ export default function RightSidebar({
   gliding,
   togglePin,
   onAutoCollapse,
+  footerRef,
   sidebarTab,
   setSidebarTab,
   tiles,
@@ -93,6 +92,12 @@ export default function RightSidebar({
     if (revealPanel) setSidebarTab('map')
   }, [revealPanel, setSidebarTab])
   const tabIds = useMemo(() => tabs.map(({ id }) => id), [tabs])
+  // The archive opens over whichever panel is showing, from the button in the foot.
+  // Only a text document has one so far.
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const hasArchive = isTextDoc(activeDoc)
+  const showArchive = archiveOpen && hasArchive
+  const activeEditor = activeDoc === secondaryDoc && activeDoc !== currentDoc ? secondaryEditor : editor
   const activeTabIndex = Math.max(0, tabIds.indexOf(sidebarTab))
 
   // When the tab list changes, never leave the sidebar on a tab that no longer
@@ -130,6 +135,7 @@ export default function RightSidebar({
       : null)
     jumpTo(nextIndex)
     setSidebarTab(nextTab)
+    setArchiveOpen(false)
   }, [activeTabIndex, jumpTo, setSidebarTab, tabIds])
   if (titleJump && gestureActive) setTitleJump(null)
   const showTitleJump = titleJump && !gestureActive && !prefersReducedMotion
@@ -167,9 +173,9 @@ export default function RightSidebar({
     '--sidebar-pane-count': tabs.length,
     width: `${tabs.length * 100}%`,
     transform: `translateX(-${visualTabProgress * (100 / tabs.length)}%)`,
-    transition: gestureActive || prefersReducedMotion
-      ? 'none'
-      : `transform ${SNAP_DURATION_MS}ms ${SNAP_EASING}`,
+    // On the fingers while they swipe; otherwise sprung there on the compositor, with
+    // a swipe's speed kept (useSpaceSwipe).
+    transition: swipe.moving || prefersReducedMotion ? 'none' : `transform ${swipe.snap}`,
   }
 
   // Only mount the active panel — plus the neighbors while swiping, so
@@ -240,7 +246,7 @@ export default function RightSidebar({
         <TimelineSidebarPanel
           projectName={projectName}
           docPath={activeDoc}
-          editor={activeDoc === secondaryDoc && activeDoc !== currentDoc ? secondaryEditor : editor}
+          editor={activeEditor}
         />
       )
     }
@@ -261,7 +267,7 @@ export default function RightSidebar({
         versions={versions?.[activeDoc]}
         setVersions={setVersions}
         // The history acts on the ACTIVE document, which may live in either pane.
-        editor={activeDoc === secondaryDoc && activeDoc !== currentDoc ? secondaryEditor : editor}
+        editor={activeEditor}
         projectName={projectName}
         docName={activeDoc}
         refreshFiles={refreshFiles}
@@ -307,7 +313,7 @@ export default function RightSidebar({
             <div
               key={titleJump.key}
               className={`right-sidebar-global-title-track is-jumping${titleJump.to > titleJump.from ? ' is-forward' : ' is-back'}`}
-              style={{ animationDuration: `${SNAP_DURATION_MS}ms`, animationTimingFunction: SNAP_EASING }}
+              style={{ animationDuration: 'var(--spring-quick-dur)', animationTimingFunction: 'var(--spring-quick)' }}
               onAnimationEnd={() => setTitleJump(null)}
             >
               {(titleJump.to > titleJump.from ? [titleJump.from, titleJump.to] : [titleJump.to, titleJump.from])
@@ -322,9 +328,7 @@ export default function RightSidebar({
             className="right-sidebar-global-title-track"
             style={{
               '--right-sidebar-title-progress': visualTabProgress,
-              transition: gestureActive || prefersReducedMotion
-                ? 'none'
-                : `transform ${SNAP_DURATION_MS}ms ${SNAP_EASING}`,
+              transition: swipe.moving || prefersReducedMotion ? 'none' : `transform ${swipe.snap}`,
             }}
           >
             {tabs.map(({ id, label }) => (
@@ -346,13 +350,28 @@ export default function RightSidebar({
         onChooseLayout={inspector.chooseLayout}
         visualProgress={visualTabProgress}
         gestureActive={gestureActive}
+        following={swipe.moving}
+        snap={swipe.snap}
         reducedMotion={prefersReducedMotion}
         onIndicatorDrag={swipe.follow}
         onIndicatorDrop={swipe.settle}
       />
 
       <div className="sidebar-content">
-        <div className={`sidebar-panels-viewport${gestureActive ? ' is-gesture-active' : ''}`}>
+        {showArchive ? (
+          <div className="sidebar-panel-page right-sidebar-archive">
+            <div className="sidebar-panel history-panel">
+              <ArchivePanel
+                projectName={projectName}
+                docName={activeDoc}
+                editor={activeEditor}
+                backLabel={tabs[activeTabIndex]?.label ?? 'the panel'}
+                onBack={() => setArchiveOpen(false)}
+              />
+            </div>
+          </div>
+        ) : null}
+        <div hidden={showArchive || undefined} className={`sidebar-panels-viewport${gestureActive ? ' is-gesture-active' : ''}`}>
           <div className="sidebar-panels-track" style={panelTrackStyle}>
             {tabs.map(({ id }) => (
               <section
@@ -361,7 +380,7 @@ export default function RightSidebar({
                 aria-hidden={sidebarTab !== id}
               >
                 <div className="sidebar-panel-page">
-                  <PanelActionsProvider slot={actionsSlot} active={sidebarTab === id && !gestureActive}>
+                  <PanelActionsProvider slot={actionsSlot} active={sidebarTab === id && !gestureActive && !showArchive}>
                     {renderedPanelIds.has(id) ? renderPanel(id) : null}
                   </PanelActionsProvider>
                 </div>
@@ -369,6 +388,26 @@ export default function RightSidebar({
             ))}
           </div>
         </div>
+      </div>
+      {/* Level with the left sidebar's + and search, the archive in the outer corner as
+          the + is. The editor portals the word count in while the inspector is docked. */}
+      <div className="right-sidebar-footer">
+        <div className="right-sidebar-footer-slot" ref={footerRef} />
+        {hasArchive ? (
+          <InlaySlot className="right-sidebar-archive-button">
+            <Inlay round>
+              <IconButton
+                icon="archive"
+                filled={showArchive}
+                label={showArchive ? 'Hide the archive' : 'Show the archive'}
+                title="Things put away out of this document"
+                size="circle"
+                aria-pressed={showArchive}
+                onClick={() => setArchiveOpen(!showArchive)}
+              />
+            </Inlay>
+          </InlaySlot>
+        ) : null}
       </div>
     </aside>
   )

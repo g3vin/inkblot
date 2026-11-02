@@ -23,12 +23,10 @@ import SidebarTabs from './RightSidebar/SidebarTabs'
 import { useLatestBridgeState } from '../bridge'
 import useSpaceSwipe from '../hooks/useSpaceSwipe'
 import usePeekDismiss from '../hooks/usePeekDismiss'
+import { FILETREE_NEW_ENTRY } from '../lib/appEvents'
 
 // Drawn with the inspector's tab strip, so both sidebars switch the same way.
 const VIEWS = [{ id: 'files', icon: 'folder', label: 'Files' }, { id: 'book', icon: 'book', label: 'Book' }]
-/** How the views glide to rest once a swipe lets go, or the switch is clicked. Matches the inspector's. */
-const SNAP_DURATION_MS = 260
-const SNAP_EASING = 'cubic-bezier(0.22, 1, 0.36, 1)'
 
 export default function LeftSidebar({
   width,
@@ -147,8 +145,8 @@ export default function LeftSidebar({
   // Creating or renaming happens in the file tree's inline box, so bring Files up for
   // it (⌘K "New canvas…" while the book is showing).
   useEffect(() => {
-    window.addEventListener('filetree:new-entry', showFiles)
-    return () => window.removeEventListener('filetree:new-entry', showFiles)
+    window.addEventListener(FILETREE_NEW_ENTRY, showFiles)
+    return () => window.removeEventListener(FILETREE_NEW_ENTRY, showFiles)
   }, [showFiles])
   const filesView = useMemo(() => (
     <FileTree
@@ -196,6 +194,8 @@ export default function LeftSidebar({
             setTab={selectView}
             visualProgress={swipe.progress}
             gestureActive={swipe.dragging}
+            following={swipe.moving}
+            snap={swipe.snap}
             reducedMotion={prefersReducedMotion}
             onIndicatorDrag={swipe.follow}
             onIndicatorDrop={swipe.settle}
@@ -211,9 +211,9 @@ export default function LeftSidebar({
                 '--sidebar-pane-count': VIEWS.length,
                 width: `${VIEWS.length * 100}%`,
                 transform: `translateX(-${swipe.progress * (100 / VIEWS.length)}%)`,
-                transition: swipe.dragging || prefersReducedMotion
-                  ? 'none'
-                  : `transform ${SNAP_DURATION_MS}ms ${SNAP_EASING}`,
+                // On the fingers while they swipe; otherwise sprung there on the
+                // compositor, with a swipe's speed kept (useSpaceSwipe).
+                transition: swipe.moving || prefersReducedMotion ? 'none' : `transform ${swipe.snap}`,
               }}
             >
               {VIEWS.map(({ id }) => (

@@ -37,7 +37,7 @@
   color: var(--text-secondary);
   cursor: pointer;
   text-align: left;
-  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+  transition: border-color var(--spring-quick-dur) var(--spring-quick), background-color var(--spring-quick-dur) var(--spring-quick), transform var(--spring-quick-dur) var(--spring-quick);
 }
 
 .draft-pane-kind:hover {
@@ -93,7 +93,7 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 160ms ease;
+  transition: background-color var(--spring-quick-dur) var(--spring-quick);
 }
 
 .draft-pane-create:hover:not(:disabled) {

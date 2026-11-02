@@ -20,6 +20,7 @@ import { isDefaultPrint, printSummary } from './usePageLayout'
 import { UNITS } from './units'
 import { SECTION_IDS } from './sectionIds'
 import { writeSectionState } from '../../../ui/sectionState'
+import { FINISHING_SECTIONS } from '../../../lib/appEvents'
 
 const running = (job) => ['preparing', 'laying', 'writing'].includes(job?.phase)
 
@@ -27,7 +28,7 @@ const SCOPES = [{ value: 'document', label: 'This document' }, { value: 'book', 
 
 const setAllSections = (open) => {
   SECTION_IDS.forEach((id) => writeSectionState(id, open))
-  window.dispatchEvent(new CustomEvent('inkblot:finishing-sections'))
+  window.dispatchEvent(new CustomEvent(FINISHING_SECTIONS))
 }
 
 export default function FinishingHeader({ layout, showsActions = true }) {

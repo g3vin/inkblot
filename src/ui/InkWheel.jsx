@@ -26,18 +26,22 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal, flushSync } from 'react-dom'
 import { INKS, inkColor, inkVar, legacyInkFor } from '../lib/palette'
 import { CENTRE, DEAD_ZONE, DOT, LEAN_GROW, LEAN_MAX, clampToReach, dragState, heldOffset, hitSlot, leanFor, placeRing, ringRadius, slotAngle, slotOffset, stepSlot } from './inkWheelGeometry.js'
+import { SPRINGS, springEasing } from './physics.js'
+import { springTiming } from './useSpring.js'
 import './InkWheel.css'
 
-// Match the durations in InkWheel.css: --dur-base plus the open stagger, --dur-fast
-// plus the close stagger.
-const OPEN_MS = 180
+// The springs InkWheel.css moves on: the bloom on --spring-smooth plus its stagger,
+// the taken ink to the middle on --spring-quick, the fold on --spring-exit plus its
+// stagger.
+const OPEN_MS = springEasing(SPRINGS.smooth).duration
 const OPEN_STAGGER_MS = 18
-const SETTLE_MS = 120
+const SETTLE_MS = springEasing(SPRINGS.quick).duration
+const FOLD_MS = springEasing(SPRINGS.exit).duration
 const CLOSE_STAGGER_MS = 8
 
-// A swap (and its undo) in --dur-base: the ink ahead slides straight in under the held
-// colour, which goes out over it to the ink's place. How far a moving dot stretches.
-const TRADE_MS = 180
+// A swap (and its undo) springs (--spring-smooth): the ink ahead slides straight in
+// under the held colour, which goes out over it to the ink's place. How far a moving
+// dot stretches.
 const STRETCH = { long: 1.3, short: 0.8 }
 
 const reducedMotion = () => Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
@@ -163,7 +167,7 @@ export default function InkWheel({ value, onChange, label, inks, none, as: Trigg
     if (!g || !LIVE.has(g.phase)) return
     releasePointer()
     const still = reducedMotion()
-    const closeMs = still ? 0 : SETTLE_MS + (count + 1) * CLOSE_STAGGER_MS
+    const closeMs = still ? 0 : FOLD_MS + (count + 1) * CLOSE_STAGGER_MS
     // Taken: the ink reaches the middle while the rest fold, then sinks into the control.
     if (picked === null) {
       patch({ phase: 'closing', swapped: null, point: { x: 0, y: 0 } })
@@ -509,8 +513,7 @@ function trade(element, from, to) {
   const [nowX = 0, nowY = 0] = style.translate && style.translate !== 'none' ? style.translate.split(' ').map(parseFloat) : []
   ;[element, face].forEach((node) => node?.getAnimations?.().forEach((animation) => { if (animation.id === 'ink-trade') animation.cancel() }))
   const start = { x: from.x + nowX - to.x, y: from.y + nowY - to.y }
-  const easing = getComputedStyle(document.documentElement).getPropertyValue('--ease-out').trim() || 'ease-out'
-  const timing = { duration: TRADE_MS, easing, id: 'ink-trade' }
+  const timing = { ...springTiming(SPRINGS.smooth), id: 'ink-trade' }
   element.animate?.([{ translate: `${start.x}px ${start.y}px` }, { translate: '0px 0px' }], timing)
   // The face, not the placed element, takes the size change and the stretch: a scale on
   // the element would scale its painted offset too and throw it off its path.

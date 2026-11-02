@@ -69,6 +69,8 @@ export interface EntryObserver {
   willChange(projectName: string): void
   renamed(projectName: string, entryPath: string, nextPath: string, type: EntryType): void
   moved(projectName: string, entryPath: string, targetFolder: string, type: EntryType): void
+  /** After a delete: what remembers documents by path (the landing page's piles) forgets them. */
+  deleted?(projectName: string, entryPath: string, type: EntryType): void
 }
 
 const observers = new Set<EntryObserver>()
@@ -94,8 +96,54 @@ export const moveEntry: EntryOperations['moveEntry'] = async (projectName, entry
   }
   return nextPath
 }
-export const deleteEntry: EntryOperations['deleteEntry'] = (...args) => current().deleteEntry(...args)
+export const deleteEntry: EntryOperations['deleteEntry'] = async (projectName, entryPath, type = 'file') => {
+  await current().deleteEntry(projectName, entryPath, type)
+  for (const observer of observers) observer.deleted?.(projectName, entryPath, type)
+}
 export const duplicateEntry: EntryOperations['duplicateEntry'] = (...args) => current().duplicateEntry(...args)
+
+export interface EntryRef { path: string; type: EntryType }
+
+/** The entries without any that a folder also in the list already carries. */
+export function topmostEntries<T extends EntryRef>(entries: T[]): T[] {
+  const folders = entries.filter((entry) => entry.type === 'folder').map((entry) => entry.path)
+  const seen = new Set<string>()
+  return entries.filter((entry) => {
+    const key = `${entry.type}:${entry.path}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return !folders.some((folder) => folder !== entry.path && entry.path.startsWith(`${folder}/`))
+  })
+}
+
+/** Can `entry` go into `targetFolder`? Not where it is already, nor a folder into itself. */
+export function canMoveInto(entry: EntryRef, targetFolder: string): boolean {
+  const parent = entry.path.split('/').slice(0, -1).join('/')
+  if (parent === targetFolder) return false
+  return !(entry.type === 'folder' && (targetFolder === entry.path || targetFolder.startsWith(`${entry.path}/`)))
+}
+
+/**
+ * Delete several entries, one after another: each goes through the page's own delete
+ * (which lets go of an open document first), and they must not race for its panes.
+ */
+export async function deleteEntries(projectName: string, entries: EntryRef[]): Promise<void> {
+  for (const entry of topmostEntries(entries)) await deleteEntry(projectName, entry.path, entry.type)
+}
+
+/**
+ * Move several entries into `targetFolder`, one after another, leaving out any already
+ * there or that would go into itself. Resolves to each moved entry's new path.
+ */
+export async function moveEntries(projectName: string, entries: EntryRef[], targetFolder: string): Promise<Array<EntryRef & { nextPath: string }>> {
+  const moved: Array<EntryRef & { nextPath: string }> = []
+  for (const entry of topmostEntries(entries)) {
+    if (!canMoveInto(entry, targetFolder)) continue
+    const nextPath = await moveEntry(projectName, entry.path, targetFolder, entry.type)
+    if (nextPath) moved.push({ ...entry, nextPath })
+  }
+  return moved
+}
 
 /** The disk operations alone, for the implementation that wraps them. */
 export const entryOperationsOnDisk = onDisk

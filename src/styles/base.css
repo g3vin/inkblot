@@ -109,3 +109,8 @@ a:focus-visible {
 .scrim {
   background: var(--scrim-bg);
 }
+
+/* Hidden text (extensions/HiddenText.js) drawn without an editor: a card on a canvas, a
+   document preview, a search result. There is no pill to open it there, so it is simply
+   left out; a live editor folds it itself. */
+[data-hidden-text]:not(.ProseMirror [data-hidden-text]) { display: none; }

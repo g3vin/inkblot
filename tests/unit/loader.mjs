@@ -1,14 +1,13 @@
 /**
  * Node ESM loader for the canvas suites.
  *
- * Six jobs:
+ * Five jobs:
  *   1. map the @tauri-apps modules onto the in-memory stubs
  *   2. resolve the extensionless relative imports Vite allows but Node does not
  *   3. transpile .jsx and .ts, so a suite can mount a real component or import a
  *      converted module
- *   4. neutralize `import.meta.glob`, which is Vite's and has no Node equivalent
- *   5. serve a `?raw` import as the file's text, the way Vite does (the citation styles)
- *   6. import JSON without an import attribute, as Vite does
+ *   4. serve a `?raw` import as the file's text, the way Vite does (the citation styles)
+ *   5. import JSON without an import attribute, as Vite does
  *
  * (3) is what lets the `dom` suite render CanvasSurface itself. esbuild is a dev
  * dependency in its own right; Vite does not provide it. The automatic JSX runtime is used,
@@ -76,8 +75,7 @@ export async function load(url, context, next) {
     return { format: 'module', source: 'export default {}', shortCircuit: true }
   }
 
-  // Vite imports JSON without `with { type: 'json' }`, and so do packages built for
-  // it (phonemize), which Node refuses.
+  // Vite imports JSON without `with { type: 'json' }`, which Node refuses.
   if (url.endsWith('.json') && context.importAttributes?.type !== 'json') {
     const text = readFileSync(fileURLToPath(url), 'utf8')
     return { format: 'module', source: `export default ${text}`, shortCircuit: true }
@@ -85,28 +83,8 @@ export async function load(url, context, next) {
 
   const ext = url.slice(url.lastIndexOf('.'))
   const loader = LOADERS[ext]
-  const isSource = url.includes('/src/')
-  if (!loader && !isSource) return next(url, context)
-
-  let source = readFileSync(fileURLToPath(url), 'utf8')
-
-  /**
-   * `import.meta.glob` is a Vite build-time transform, not a runtime function, so a
-   * module using it (readAloud.js) throws on import under Node before any of its
-   * exports exist.
-   *
-   * It is rewritten to a call returning an empty map. Anything that actually needs the
-   * globbed assets (the bundled Kokoro voice files) cannot work outside the app
-   * anyway; everything else in the module becomes importable.
-   *
-   * This runs before the transpile, not instead of it: a module can need both.
-   */
-  const globbed = isSource && source.includes('import.meta.glob')
-  if (globbed) source = source.replaceAll('import.meta.glob', '(() => ({}))')
-
-  if (!loader) {
-    return globbed ? { format: 'module', source, shortCircuit: true } : next(url, context)
-  }
+  if (!loader) return next(url, context)
+  const source = readFileSync(fileURLToPath(url), 'utf8')
 
   const { code } = await transform(source, {
     loader,

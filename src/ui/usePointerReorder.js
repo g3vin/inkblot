@@ -12,8 +12,14 @@
  *
  * `inside` is false when the pointer was let go outside the list: the caller decides
  * whether that removes the item (the toolbar does) or cancels (everything else).
+ *
+ * Once the caller has reordered, the items spring from where they were drawn to their
+ * new places, and the dropped one from under the hand at the speed it was let go
+ * (springLayout), so nothing jumps.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { trackSample, velocityFrom } from './physics.js'
+import { springLayout } from './useSpring.js'
 
 const DRAG_THRESHOLD = 4
 
@@ -78,6 +84,7 @@ export default function usePointerReorder({ listRef, itemSelector = '[data-reord
     if (disabled || event.button !== 0) return
     const origin = { x: event.clientX, y: event.clientY }
     dragRef.current = { id, external, payload, origin, point: origin, started: false, inside: !external, insertIndex: null }
+    const samples = [{ t: performance.now(), ...origin }]
 
     const move = (e) => {
       const point = { x: e.clientX, y: e.clientY }
@@ -85,6 +92,7 @@ export default function usePointerReorder({ listRef, itemSelector = '[data-reord
       if (!current) return
       if (!current.started && Math.hypot(point.x - origin.x, point.y - origin.y) < DRAG_THRESHOLD) return
       e.preventDefault()
+      trackSample(samples, { t: performance.now(), ...point })
       update(point)
     }
     const end = (e) => {
@@ -100,6 +108,7 @@ export default function usePointerReorder({ listRef, itemSelector = '[data-reord
       const point = { x: e.clientX, y: e.clientY }
       const listRect = listRef.current?.getBoundingClientRect()
       const inside = Boolean(listRect && within(listRect, point, slop))
+      const settle = springLayout(listRef.current, itemSelector, (element) => element.dataset.reorderId)
       handlers.current.onDrop?.({
         id: current.id,
         external: current.external,
@@ -108,6 +117,8 @@ export default function usePointerReorder({ listRef, itemSelector = '[data-reord
         index: inside ? insertionIndex(point, rects, axis) : null,
         point,
       })
+      // After the caller's reorder has been drawn.
+      if (inside) requestAnimationFrame(() => settle({ id: current.id, from: point, velocity: velocityFrom(samples) }))
     }
     const cancel = () => {
       window.removeEventListener('pointermove', move, true)
@@ -119,7 +130,7 @@ export default function usePointerReorder({ listRef, itemSelector = '[data-reord
     window.addEventListener('pointermove', move, true)
     window.addEventListener('pointerup', end, true)
     window.addEventListener('pointercancel', cancel, true)
-  }, [axis, disabled, listRef, measure, slop, update])
+  }, [axis, disabled, itemSelector, listRef, measure, slop, update])
 
   useEffect(() => () => { dragRef.current = null }, [])
 

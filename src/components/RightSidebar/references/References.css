@@ -47,7 +47,7 @@
 .reference-badge { font-size: 10px; color: var(--text-muted); }
 .reference-badge[data-tone='accent'] { color: var(--accent-foreground); }
 .reference-badge[data-tone='warning'] { color: var(--status-warning); }
-.reference-actions { display: flex; gap: 2px; opacity: 0.35; transition: opacity var(--dur-fast); }
+.reference-actions { display: flex; gap: 2px; opacity: 0.35; transition: opacity var(--spring-quick-dur) var(--spring-quick); }
 .reference-row:hover .reference-actions,
 .reference-row.is-expanded .reference-actions,
 .reference-row.is-highlighted .reference-actions { opacity: 1; }

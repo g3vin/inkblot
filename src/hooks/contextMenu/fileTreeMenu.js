@@ -4,13 +4,19 @@
  * Only the file branch pops its own menu. The project, folder and empty-space
  * branches append to the shared item list and fall through to the common actions,
  * which is how the original single callback behaved.
+ *
+ * A row chosen with others (`data-selected`, FileTree's multi-selection) pops a menu
+ * for all of them instead. FileTree owns the selection, so its actions are asked of
+ * it with `filetree:selection`.
  */
-import { deleteProject, getProjectRoot, moveProject } from '../../lib/FileSystem'
-import { deleteEntry, duplicateEntry } from '../../lib/entryOperations'
+import { getProjectRoot, moveProject } from '../../lib/FileSystem'
+import { deleteProjectEverywhere } from '../../lib/projectLifecycle'
+import { deleteEntry, duplicateEntry, topmostEntries } from '../../lib/entryOperations'
 import { allFolderPresets, openFolderPresets } from '../../lib/folderPresets'
 import { openDocumentWindow } from '../../lib/docWindow'
 import { lockReason, setDocumentLocked, setFolderLocked } from '../../lib/docLocks'
 import { isEntryEmpty } from '../../lib/emptiness'
+import { FILETREE_FOLDERS_VISIBILITY, FILETREE_NEW_ENTRY, FILETREE_NEW_PROJECT, FILETREE_REFRESH_PROJECTS, FILETREE_SELECTION } from '../../lib/appEvents'
 
 export async function fileTreeMenu(ctx) {
   const {
@@ -20,10 +26,12 @@ export async function fileTreeMenu(ctx) {
     beginRename,
     buildCopyPathSubmenu,
     buildMoveToSubmenu,
+    buildMoveSelectionToSubmenu,
     confirmDelete,
     e,
     fileItem,
     fileTree,
+    fileTreeEl,
     isFileTreeArea,
     items,
     onOpenDocInSplit,
@@ -44,7 +52,7 @@ export async function fileTreeMenu(ctx) {
           text: 'Rename project',
           action: async () => {
             window.dispatchEvent(
-              new CustomEvent('filetree:new-entry', {
+              new CustomEvent(FILETREE_NEW_ENTRY, {
                 detail: {
                   rename: true,
                   path: projectNameToDelete,
@@ -80,7 +88,7 @@ export async function fileTreeMenu(ctx) {
                 await message(reason, { title: 'Move project', kind: 'error' })
                 return
               }
-              window.dispatchEvent(new CustomEvent('filetree:refresh-projects'))
+              window.dispatchEvent(new CustomEvent(FILETREE_REFRESH_PROJECTS))
               await refreshFiles?.()
             } catch (err) {
               console.warn('Failed to move project:', err)
@@ -110,8 +118,8 @@ export async function fileTreeMenu(ctx) {
           action: async () => {
             const ok = await confirmDelete(`Delete project "${projectNameToDelete}"?`)
             if (ok) {
-              await deleteProject(projectNameToDelete)
-              window.dispatchEvent(new CustomEvent('filetree:refresh-projects'))
+              await deleteProjectEverywhere(projectNameToDelete)
+              window.dispatchEvent(new CustomEvent(FILETREE_REFRESH_PROJECTS))
               await refreshFiles?.()
             }
           },
@@ -125,11 +133,31 @@ export async function fileTreeMenu(ctx) {
       await MenuItem.new({
         text: 'New project',
         action: async () => {
-          window.dispatchEvent(new CustomEvent('filetree:new-project'))
+          window.dispatchEvent(new CustomEvent(FILETREE_NEW_PROJECT))
         },
       })
     )
   }
+  if (fileItem?.hasAttribute('data-selected') && fileTreeEl) {
+    const entries = topmostEntries([...fileTreeEl.querySelectorAll('.file-item[data-selected]')].map((row) => ({
+      path: row.getAttribute('data-entry-path') || '',
+      type: row.getAttribute('data-entry-type') === 'folder' ? 'folder' : 'file',
+    })))
+    if (entries.length > 1) {
+      const ask = (action) => () => window.dispatchEvent(new CustomEvent(FILETREE_SELECTION, { detail: { action } }))
+      const selectionMenu = await Menu.new({
+        items: [
+          await buildMoveSelectionToSubmenu(entries),
+          await MenuItem.new({ text: `New folder with ${entries.length} items`, action: ask('group') }),
+          await PredefinedMenuItem.new({ item: 'Separator' }),
+          await MenuItem.new({ text: `Delete ${entries.length} items`, action: ask('delete') }),
+        ],
+      })
+      await selectionMenu.popup()
+      return true
+    }
+  }
+
   if (fileItem && fileItem.hasAttribute('data-entry-path')) {
     const entryType = fileItem.getAttribute('data-entry-type') || 'file'
     const entryPath = fileItem.getAttribute('data-entry-path') || ''
@@ -225,7 +253,7 @@ export async function fileTreeMenu(ctx) {
           text: 'New file in folder',
           action: () => {
             window.dispatchEvent(
-              new CustomEvent('filetree:new-entry', {
+              new CustomEvent(FILETREE_NEW_ENTRY, {
                 detail: { type: 'file', parent: entryPath },
               })
             )
@@ -238,7 +266,7 @@ export async function fileTreeMenu(ctx) {
           text: 'New folder in folder',
           action: () => {
             window.dispatchEvent(
-              new CustomEvent('filetree:new-entry', {
+              new CustomEvent(FILETREE_NEW_ENTRY, {
                 detail: { type: 'folder', parent: entryPath },
               })
             )
@@ -287,7 +315,7 @@ export async function fileTreeMenu(ctx) {
         text: 'New file',
         action: async () => {
           window.dispatchEvent(
-            new CustomEvent('filetree:new-entry', {
+            new CustomEvent(FILETREE_NEW_ENTRY, {
               detail: { type: 'file', parent: '' },
             })
           )
@@ -300,7 +328,7 @@ export async function fileTreeMenu(ctx) {
         text: 'New folder',
         action: async () => {
           window.dispatchEvent(
-            new CustomEvent('filetree:new-entry', {
+            new CustomEvent(FILETREE_NEW_ENTRY, {
               detail: { type: 'folder', parent: '' },
             })
           )
@@ -315,7 +343,7 @@ export async function fileTreeMenu(ctx) {
           text: `New ${preset.menuLabel}`,
           action: async () => {
             window.dispatchEvent(
-              new CustomEvent('filetree:new-entry', {
+              new CustomEvent(FILETREE_NEW_ENTRY, {
                 detail: { type: 'folder', parent: '', presetKey: preset.key },
               })
             )
@@ -332,7 +360,7 @@ export async function fileTreeMenu(ctx) {
         text: 'Expand all folders',
         action: () => {
           window.dispatchEvent(
-            new CustomEvent('filetree:folders-visibility', {
+            new CustomEvent(FILETREE_FOLDERS_VISIBILITY, {
               detail: { action: 'expand-all' },
             })
           )
@@ -342,7 +370,7 @@ export async function fileTreeMenu(ctx) {
         text: 'Collapse all folders',
         action: () => {
           window.dispatchEvent(
-            new CustomEvent('filetree:folders-visibility', {
+            new CustomEvent(FILETREE_FOLDERS_VISIBILITY, {
               detail: { action: 'collapse-all' },
             })
           )

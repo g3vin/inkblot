@@ -512,7 +512,7 @@ export function createDocumentSurface({
   }))
 
   /* `getReadAloudPayload` has no handler here on purpose. Building it needs the read
-     aloud module, which loads Kokoro and which `ReadAloudControl` already owns; it
+     aloud module, which `ReadAloudControl` already owns; it
      registers the handler through `onRequest` while it is mounted. When it is not, the
      request replies with an error rather than hanging — see `createSurfaceBridge`. */
 

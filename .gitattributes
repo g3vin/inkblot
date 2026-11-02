@@ -1,0 +1,6 @@
+# Generated: collapsed in GitHub diffs and left out of language stats.
+src/types/inkblot-core.ts linguist-generated=true
+scripts/design-baseline.json linguist-generated=true
+# Lockfiles: a diff of one is never worth reading.
+package-lock.json linguist-generated=true -diff
+src-tauri/Cargo.lock linguist-generated=true -diff

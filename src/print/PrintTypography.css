@@ -286,7 +286,7 @@
   content: attr(data-placeholder);
   opacity: 0;
   font-style: italic;
-  transition: opacity 120ms;
+  transition: opacity var(--spring-quick-dur) var(--spring-quick);
 }
 .chapter-head:hover .ch-editable[data-empty]::before,
 .chapter-head .ch-editable[data-empty]:focus::before { opacity: 0.4; }

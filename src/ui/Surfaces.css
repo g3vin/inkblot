@@ -116,7 +116,7 @@
 
 .ib-card--interactive {
   cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+  transition: border-color var(--spring-quick-dur) var(--spring-quick), background-color var(--spring-quick-dur) var(--spring-quick);
 }
 
 .ib-card--interactive:hover { border-color: var(--border-strong); }
@@ -171,7 +171,7 @@
 /* A drop target only shows itself while something is over it. */
 .ib-empty {
   border-radius: var(--radius-md);
-  transition: background var(--dur-fast) var(--ease-out);
+  transition: background var(--spring-quick-dur) var(--spring-quick);
 }
 .ib-empty.is-drop-active { background: var(--accent-surface); }
 .ib-empty.is-drop-active .ib-empty-icon { color: var(--accent-foreground); }
@@ -188,7 +188,7 @@
   color: var(--text-secondary);
   font: 500 var(--text-xs)/1 var(--font-ui);
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  transition: background var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick);
 }
 .ib-scope-menu:hover,
 .ib-scope-menu[aria-expanded='true'] { background: var(--surface-hover); color: var(--text-primary); }
@@ -231,7 +231,7 @@
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   cursor: pointer;
-  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+  transition: color var(--spring-quick-dur) var(--spring-quick), border-color var(--spring-quick-dur) var(--spring-quick);
 }
 
 .ib-tab:hover { color: var(--text-primary); border-color: transparent; }

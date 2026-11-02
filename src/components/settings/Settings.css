@@ -34,7 +34,7 @@
   min-height: 30px; padding: 0; border: 0; background: none;
   color: var(--text-primary); font: 12px var(--font-ui); text-align: left; cursor: pointer;
 }
-.settings-chevron { transition: transform var(--dur-fast) var(--ease-standard); }
+.settings-chevron { transition: transform var(--spring-quick-dur) var(--spring-quick); }
 .settings-disclosure[data-open='true'] .settings-chevron { transform: rotate(90deg); }
 .settings-disclosure-title { flex: 1; }
 .settings-disclosure-value { color: var(--text-secondary); text-align: right; }
@@ -65,3 +65,13 @@
 .settings-shortcut-keys { min-width: 96px; justify-content: center; }
 .settings-shortcut[data-recording='true'] .settings-shortcut-keys { color: var(--accent-color); box-shadow: 0 0 0 1px var(--accent-border); }
 .settings-shortcut-conflict { display: flex; align-items: center; gap: var(--space-1); margin: 0; font-size: var(--text-xs); color: var(--status-warning); }
+
+/* Selection wheel: the wheel as it will open, over the list of tools it can hold. */
+.settings-wheel { display: flex; justify-content: center; padding-block: var(--space-3); }
+.settings-wheel-tools { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.settings-wheel-tool {
+  display: flex; align-items: center; gap: var(--space-2);
+  min-height: 30px; border-bottom: 1px solid var(--border-muted);
+  font: var(--text-sm) var(--font-ui); color: var(--text-primary);
+}
+.settings-wheel-tool[data-on='false'] { color: var(--text-secondary); }

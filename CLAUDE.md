@@ -2,74 +2,78 @@
 
 Guidance for AI agents working in this repository.
 
+<!-- Maintainers: this file loads into every session, so keep it short. Area-specific
+guidance belongs in .claude/rules/ (path-scoped), procedures in .claude/skills/. HTML
+comments like this one are stripped before loading. -->
+
+## Never read the writer's documents
+
+The person who uses this repository writes with Inkblot. Their projects are private
+personal writing. **Never read, open, search, quote, summarise, copy, screenshot or edit
+anything inside them, and never load their contents into this conversation, a subagent,
+memory or any file.** This holds even when a task seems to need it (debugging a real
+document, reproducing a bug, checking a migration): ask the user instead, and work from
+the mock or a fixture.
+
+- Off-limits: Inkblot's app data folder (`~/Library/Application Support/com.inkblot.app/`
+  on macOS, `com.inkblot.app` under the app data folder elsewhere), with its projects,
+  `preferences.json` (it holds excerpts), stats and version history; and every project
+  folder linked elsewhere (listed in `.inkblot-project-locations.json` in that folder).
+- Allowed: the project *names*, from a plain `ls` of the app data folder. Nothing deeper.
+- Test and read only Inkblot's own data: the in-memory mock at `/?mock`
+  (`scripts/dev/tauri-mock.js`), `showcase/fixtures/`, and the stubs in `tests/unit/`.
+  Never run the desktop app against the real projects to look at or screenshot it.
+
+`scripts/claude/private-writing.mjs` (a PreToolUse hook) and the `deny` rules in
+`.claude/settings.json` enforce this; don't work around them.
+
 ## Read first
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)**: how the page, the Rust crates and the shells
-  fit together. Read it before changing anything that crosses a boundary.
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: how the page, the Rust crates and the shells fit
+  together. Before changing anything that crosses a boundary, read "The pieces" and the
+  section for the area (`grep -n '^## ' ARCHITECTURE.md`). Always read "Things that will bite you".
 - **[CONTRIBUTING.md](CONTRIBUTING.md)**: branches, Conventional Commits, code style.
-- **[README.md → Checks](README.md#checks)**: the commands to run before committing.
+- `.claude/rules/` loads the UI, Rust, bridge and test rules when you touch those paths.
+  UI work follows [docs/DESIGN.md](docs/DESIGN.md); its brief loads with the UI rule.
+- Skills: `run-app` (see a change in a browser), `add-bridge-message`, `add-toolbar-item`,
+  `design-review`, `perf-review`. Agents: `checks` (runs checks, reports only failures),
+  `explore-inkblot` (read-only locator that knows this map).
 
-## Design language (required for all UI work)
+## Where things live
 
-**Before making any user-facing change — a new feature, a fix to something visible,
-copy, styling, layout, icons, or a new component — read [docs/DESIGN.md](docs/DESIGN.md)
-and follow it.** It is the single source of truth for how Inkblot looks, feels and
-speaks. The short version:
+- Every module opens with a header comment saying what it owns. Read the first 30 lines,
+  then grep for the part you need; several files run past 1,000 lines.
+- `src/map`, `src/timeline`, `src/canvas` are UI; their models are in `src/lib/map/`,
+  `src/lib/timeline/` and `src/lib/canvas*.js`.
+- `src/lib/commands.ts` is the ⌘K registry; `src/bridge/commands.ts` runs NativeCommands.
+  `docLock` is the per-document write mutex; `docLocks` is the documents a writer locked.
+- Window events shared across modules are named in `src/lib/appEvents.ts`; single-owner
+  events live with their owner (grep the constant).
+- A JS module with a Rust twin says `Mirrors:` in its header; change both and run
+  `npm run parity` (table: ARCHITECTURE.md → "JavaScript and Rust parity").
+- Generated, never edit by hand: `src/types/inkblot-core.ts` (`npm run types`; excluded
+  from search, so grep the Rust type instead), `scripts/design-baseline.json`
+  (`npm run lint:design -- --update-baseline`), the `--spring-*` tokens
+  (`scripts/gen-spring-tokens.mjs`). Scripts are indexed in `scripts/README.md`.
 
-- Build from the primitives in `src/ui/` (`Button`, `IconButton`, `Segmented`, `Menu`,
-  `Popover`, `Dialog`, `Section` + `FormRow`/`Toggle`/`Stepper`/`SelectMenu`,
-  `Panel`, `Card`, `EmptyState`, `InkWheel`, `InkPicker`, `FloatingCapsule`, …). Don't
-  restyle bare elements or write one-off modals, menus or colour pickers.
-- Never hard-code a colour, font, radius or shadow. Use the tokens in
-  `src/styles/tokens.css`. Anything a writer colours uses an ink id from
-  `src/lib/palette.ts`, drawn with `inkColor()`.
-- Typefaces: Inter (`--font-ui`) for chrome, eyebrows included (`.ib-eyebrow`, bold
-  capitals), Literata (`--font-editor`) for the writer's words, and Courier Prime
-  (`--font-type`) only for small typewritten accents (`.ib-meta`, `Kbd`, empty-state
-  titles).
-- Icons: `<Icon name="…" />` (Phosphor Light; Fill when active), 16 or 20px, named by
-  meaning in `src/ui/icons.js`.
-- The document is the room: a seamless writing surface in a card on the window's tinted
-  tray, with the sidebars docked on the tray or hovering over the card, and the toolbar
-  ruled off at the card's top (docs/DESIGN.md §6).
-- Keep the surface simple. Register every new action with `useCommands`
-  (`src/lib/commands.ts`) so it appears in the ⌘K palette, and put advanced tools in
-  "More" menus or inspector panels.
-- Copy is plain and warm: sentence case, verb first, no jargon on the surface.
-- Liquid Glass appears on iOS/iPadOS only, and only on floating chrome over the page
-  (the `.floating-capsule` surface: `FloatingToolbar`, `FloatingActionButton`,
-  `FloatingCapsule`).
-- The logo is `Mark` / `Wordmark` / `AppIcon` from `src/ui`: black on white, never
-  recoloured or redrawn (regenerate it with `docs/brand/generator/`).
-- Both themes, AA contrast, keyboard access and reduced motion, every time.
+## Working efficiently
 
-Check UI work with `npm run lint:design` (it must pass) and in the showcase
-(`npm run dev`, then `/?design`) in light and dark. If the system lacks something you
-need, extend it: `src/ui` + showcase + `docs/DESIGN.md`, in the same change. Don't work
-around it locally.
-
-## Work in progress
-
-Every surface is on the design language. What's left (the logo check on real devices,
-moving bare buttons onto `src/ui`) and the gotchas are in
-[docs/design-handoff.md](docs/design-handoff.md). Read it before design-system work.
+- Search with the Grep tool or `rg`, never `grep -r` (it walks build output; a hook blocks it).
+- Prefer the LSP tool for definitions, references and types when it is available.
+- Pick checks with `npm run affected`, not by guessing suites. For a long check run, use
+  the `checks` agent so the output stays out of this conversation.
 
 ## Code comments
 
-The full standard is in [CONTRIBUTING.md → Comments](CONTRIBUTING.md#comments). The rules:
+Full standard: [CONTRIBUTING.md → Comments](CONTRIBUTING.md#comments).
 
-- **Explain why, not what or when.** Keep intent, invariants, and ordering,
-  performance or security constraints the code can't show.
-- **Never write history:** "changed from", "previously", "now uses", "fixed the bug
-  where", dates. Never leave commented-out code. Never address a comment to an AI
-  assistant or write one as one. History goes in the commit message, the PR
-  description or CHANGELOG.md; how modules fit together goes in ARCHITECTURE.md.
-- **Fixing a bug:** explain it in the commit message. Add a comment only if the fixed
-  code would look wrong or removable without it, and then state the constraint.
-- **Workarounds** for outside bugs: one or two lines, a link to the issue, and when it
-  can be removed.
-- **TODOs** are `TODO(#123): …` or carry a one-line reason. A lint suppression
-  carries its reason after `--`.
+- Explain why, not what or when: intent, invariants, ordering, performance or security
+  constraints the code can't show.
+- Never write history ("previously", "now uses", "fixed the bug where", dates), never leave
+  commented-out code, never address a comment to an AI. History goes in the commit message.
+- A bug fix is explained in the commit message; comment only if the fixed code would look
+  removable, and then state the constraint. Workarounds link the issue and say when to remove.
+- `TODO(#123): …` or a one-line reason. A lint suppression carries its reason after `--`.
 
 ```js
 // Bad:  Fixed rename losing the last edit (we used to save after renaming).
@@ -78,10 +82,16 @@ The full standard is in [CONTRIBUTING.md → Comments](CONTRIBUTING.md#comments)
 
 ## Checks
 
-These must pass before you commit (what each catches: [README → Checks](README.md#checks)):
+Must pass before you commit ([README → Checks](README.md#checks)):
 
-- `npm run lint` (0 errors and 0 warnings), `npm run lint:design`, `npm run typecheck`,
-  `npm test`, `npm run build`
-- When you touch Rust or a mirrored module: `npm run parity`, `npm run types:check`,
-  `cd src-tauri && cargo build --workspace && cargo test --workspace`, and
-  `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings`
+- `npm run check` (lint with 0 warnings, lint:design, typecheck, tests), then `npm run build`.
+- Rust or a mirrored module touched: `npm run check:rust` (fmt, clippy, cargo test, parity,
+  types:check), then `cd src-tauri && cargo build -q --workspace`.
+
+While iterating: `npm run affected` prints the suites and commands your diff needs;
+`npm test -- <suite> [<suite>…]` runs some suites (names in `tests/unit/run.mjs`).
+
+# Compact instructions
+
+When compacting, keep: the files changed and why, failing checks with their key output,
+decisions the user made, and the next step. Drop passing output and file contents.

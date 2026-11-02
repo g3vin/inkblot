@@ -17,6 +17,7 @@ import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
 import IconButton from './IconButton.jsx'
 import Menu, { MenuItem } from './Menu.jsx'
+import { menuItemsOf } from './menuItemsOf.jsx'
 import './Surfaces.css'
 
 const PanelActionsContext = createContext({ inline: true, slot: null, active: true })
@@ -74,8 +75,12 @@ export function ScopeMenu({ value, onChange, options, label }) {
   )
 }
 
-/** ⋯: a panel's rarer options. Children are MenuItems (or a function of { close }). */
-export function MoreMenu({ label = 'More', children }) {
+/**
+ * ⋯: a panel's rarer options. Children are MenuItems (or a function of { close }), or
+ * `items` is the plain description a right-click's menu takes (useNativeMenu.js), so
+ * the two can share one list.
+ */
+export function MoreMenu({ label = 'More', items, className, children, ...rest }) {
   const [open, setOpen] = useState(false)
   const anchorRef = useRef(null)
   return (
@@ -84,13 +89,15 @@ export function MoreMenu({ label = 'More', children }) {
         ref={anchorRef}
         icon="more"
         label={label}
+        className={className}
         size="capsule"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
+        {...rest}
       />
       <Menu open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} placement="bottom-end" label={label}>
-        {children}
+        {children ?? menuItemsOf(items || [])}
       </Menu>
     </>
   )

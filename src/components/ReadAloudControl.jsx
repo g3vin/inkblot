@@ -1,29 +1,35 @@
 /**
- * ReadAloudControl.jsx — toolbar button + popover for read-aloud playback.
+ * ReadAloudControl.jsx — toolbar button + popover for read-aloud playback. In the card's
+ * toolbar the popover is one compact row in place (DESIGN.md §6): read or stop, the level
+ * meter, and the voice, which swaps the row for the voices to choose from.
  *
- * Drives the Kokoro TTS pipeline in lib/readAloud: builds chunks from the
+ * Drives the Pocket TTS pipeline in lib/readAloud: builds chunks from the
  * editor text (or selection), generates audio ahead of playback
  * (READ_ALOUD_PREFETCH_AHEAD), plays chunks back-to-back while highlighting
  * the spoken word via the ReadAloudHighlight extension, and animates a
- * level-meter visualization. Voice choice persists to the preference store; falls
- * back to the system speechSynthesis voices if Kokoro can't load.
+ * level-meter visualization. Voice choice persists to the preference store.
+ *
+ * The model is downloaded once, so until it is the row offers the download in place
+ * of the player. Where there is no native backend (a plain browser), or it stops
+ * answering, it reads with the system speechSynthesis voices instead.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Button from '../ui/Button.jsx'
-import { Field } from '../ui/Field.jsx'
-import { SelectMenu } from '../ui/FormRow.jsx'
 import Icon from '../ui/Icon.jsx'
 import Popover from '../ui/Popover.jsx'
+import MenuRow from './toolbar/MenuRow'
 import { useCommands } from '../lib/commands'
 import { clearReadAloudHighlight, setReadAloudHighlight } from '../extensions/ReadAloudHighlight'
 import {
   DEFAULT_READ_ALOUD_VOICE,
   READ_ALOUD_VOICES,
   buildReadAloudChunks,
+  downloadSpeechModel,
   generateReadAloudAudio,
   getReadableEditorPayload,
-  isKokoroGenerationTimeoutError,
+  getSpeechModelStatus,
+  isModelNotInstalledError,
   prewarmReadAloud,
+  shouldUseSystemSpeech,
 } from '../lib/readAloud'
 import { getPreference, setPreference } from '../lib/preferences'
 import { documentSurface, editorRegistry } from '../bridge'
@@ -34,50 +40,25 @@ const READ_ALOUD_BAR_RESPONSE = [0.56, 0.9, 1, 0.76, 0.94, 0.62]
 const READ_ALOUD_BAR_KEYS = ['sub', 'low', 'lowMid', 'highMid', 'presence', 'air']
 const READ_ALOUD_PREFETCH_AHEAD = 2
 const WORD_HIGHLIGHT_LAG_MS = 180
-const SYSTEM_FEMALE_VOICE_HINTS = ['samantha', 'victoria', 'ava', 'allison', 'karen', 'serena']
-const SYSTEM_MALE_VOICE_HINTS = ['alex', 'daniel', 'tom', 'fred', 'oliver']
+// The download is the four graphs and the voices; shown before it starts.
+const SPEECH_DOWNLOAD_SIZE = 'About 440 MB'
 
-const formatProgress = (progress) => {
-  if (!progress || typeof progress !== 'object') return ''
-
-  if (Number.isFinite(progress.progress)) {
-    const fileLabel = progress.file ? `${String(progress.file).split('/').pop()} ` : ''
-    return `${fileLabel}${Math.round(progress.progress)}%`
-  }
-
-  if (progress.status === 'download' && progress.file) {
-    return `Downloading ${String(progress.file).split('/').pop()}`
-  }
-
-  if (progress.status === 'initiate' && progress.file) {
-    return `Starting ${String(progress.file).split('/').pop()}`
-  }
-
-  if (progress.status === 'done' && progress.file) {
-    return `Loaded ${String(progress.file).split('/').pop()}`
-  }
-
-  if (progress.status === 'ready') return 'Ready'
-  if (typeof progress.status === 'string') return progress.status
-  return ''
+const formatDownloadProgress = (progress) => {
+  if (!progress) return 'Starting…'
+  const percent = progress.total > 0 ? ` · ${Math.round((progress.received / progress.total) * 100)}%` : ''
+  return `${progress.index} of ${progress.count}${percent}`
 }
 
-const pickSystemVoiceForKokoroVoice = (kokoroVoice) => {
+/** The system voice to fall back on: the best-known English ones first. */
+const pickSystemVoice = () => {
   const synth = window.speechSynthesis
   if (!synth?.getVoices) return null
 
   const voices = synth.getVoices()
-  if (!voices.length) return null
-
-  const wantsBritish = kokoroVoice?.startsWith('b')
-  const wantsMale = kokoroVoice?.includes('m_')
-  const languagePrefix = wantsBritish ? 'en-GB' : 'en-US'
-  const hints = wantsMale ? SYSTEM_MALE_VOICE_HINTS : SYSTEM_FEMALE_VOICE_HINTS
-  const matchingLanguageVoices = voices.filter((voice) => voice.lang?.startsWith(languagePrefix))
-
-  return matchingLanguageVoices.find((voice) => (
-    hints.some((hint) => voice.name.toLowerCase().includes(hint))
-  )) || matchingLanguageVoices[0] || voices.find((voice) => voice.lang?.startsWith('en')) || voices[0] || null
+  const english = voices.filter((voice) => voice.lang?.startsWith('en'))
+  const preferred = ['ava', 'samantha', 'daniel', 'serena', 'allison', 'karen']
+  return preferred.map((hint) => english.find((voice) => voice.name.toLowerCase().includes(hint))).find(Boolean)
+    || english.find((voice) => voice.default) || english[0] || voices[0] || null
 }
 
 const getLocalWordOffsets = (text, words) => {
@@ -146,6 +127,8 @@ export default function ReadAloudControl({ editor }) {
   const systemUtteranceRef = useRef(null)
   const useSystemSpeechRef = useRef(false)
   const [open, setOpen] = useState(false)
+  // Choosing a voice: the row shows the voices in place of the player.
+  const [choosingVoice, setChoosingVoice] = useState(false)
   const [voice, setVoice] = useState(() => {
     const storedVoice = getPreference(READ_ALOUD_VOICE_STORAGE_KEY)
     return READ_ALOUD_VOICES.some((option) => option.id === storedVoice)
@@ -154,6 +137,10 @@ export default function ReadAloudControl({ editor }) {
   })
   const [status, setStatus] = useState('idle')
   const [message, setMessage] = useState('')
+  // 'unknown' until asked, then 'missing', 'downloading' or 'ready'. 'unavailable'
+  // where there is no native backend, which reads with the system voices.
+  const [modelState, setModelState] = useState('unknown')
+  const [downloadProgress, setDownloadProgress] = useState(null)
   const [levels, setLevels] = useState(INITIAL_READ_ALOUD_LEVELS)
   useEffect(() => {
     setPreference(READ_ALOUD_VOICE_STORAGE_KEY, voice)
@@ -162,23 +149,59 @@ export default function ReadAloudControl({ editor }) {
   useEffect(() => documentSurface.onRequest('getReadAloudPayload', answerReadAloudPayload), [])
 
   useEffect(() => {
-    if (!open || status === 'loading' || status === 'playing') return
+    if (!open || modelState !== 'unknown') return undefined
 
     let cancelled = false
-    setMessage('Warming Kokoro...')
-
-    prewarmReadAloud({ voice })
-      .then(() => {
-        if (!cancelled) setMessage('')
+    getSpeechModelStatus()
+      .then(({ installed }) => {
+        if (!cancelled) setModelState(installed ? 'ready' : 'missing')
       })
       .catch((error) => {
-        if (!cancelled) setMessage(error?.message || String(error))
+        if (cancelled) return
+        if (shouldUseSystemSpeech(error)) {
+          useSystemSpeechRef.current = true
+          setModelState('unavailable')
+        } else {
+          setMessage(error?.message || String(error))
+        }
       })
 
     return () => {
       cancelled = true
     }
-  }, [open, status, voice])
+  }, [open, modelState])
+
+  useEffect(() => {
+    if (!open || modelState !== 'ready' || status === 'loading' || status === 'playing') return undefined
+
+    let cancelled = false
+    prewarmReadAloud({ voice }).catch((error) => {
+      if (cancelled) return
+      if (isModelNotInstalledError(error)) setModelState('missing')
+      else if (!shouldUseSystemSpeech(error)) setMessage(error?.message || String(error))
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, modelState, status, voice])
+
+  const downloadVoices = useCallback(async () => {
+    setModelState('downloading')
+    setDownloadProgress(null)
+    setStatus('idle')
+    setMessage('')
+    try {
+      await downloadSpeechModel(setDownloadProgress)
+      setModelState('ready')
+    } catch (error) {
+      setModelState('missing')
+      setStatus('error')
+      setMessage(`Couldn’t download the voices: ${error?.message || error}`)
+    } finally {
+      setDownloadProgress(null)
+    }
+  }, [])
 
   const clearWordHighlight = useCallback(() => {
     highlightTimersRef.current.forEach((timer) => window.clearTimeout(timer))
@@ -322,7 +345,7 @@ export default function ReadAloudControl({ editor }) {
 
   const playAudioChunk = useCallback(async (audio, requestId, words) => {
     if (!(audio?.audio instanceof Float32Array) || !audio.audio.length) {
-      throw new Error('Kokoro returned an empty audio chunk.')
+      throw new Error('The voice returned no audio.')
     }
 
     const audioContext = await getAudioContext()
@@ -381,14 +404,14 @@ export default function ReadAloudControl({ editor }) {
 
   const playSystemSpeechChunk = useCallback(async (text, requestId, words) => {
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
-      throw new Error('Kokoro stalled, and system speech is not available in this webview.')
+      throw new Error('On-device speech stopped, and there is no system voice to use instead.')
     }
 
     cleanupAudio()
     clearWordHighlight(false)
 
     const utterance = new window.SpeechSynthesisUtterance(text)
-    const systemVoice = pickSystemVoiceForKokoroVoice(voice)
+    const systemVoice = pickSystemVoice()
     if (systemVoice) utterance.voice = systemVoice
     utterance.rate = 1
     utterance.pitch = 1
@@ -428,7 +451,7 @@ export default function ReadAloudControl({ editor }) {
       window.speechSynthesis.cancel()
       window.speechSynthesis.speak(utterance)
     })
-  }, [cleanupAudio, clearWordHighlight, editor, startSystemSpeechWaveform, voice])
+  }, [cleanupAudio, clearWordHighlight, editor, startSystemSpeechWaveform])
 
   const stop = useCallback(() => {
     requestIdRef.current += 1
@@ -440,6 +463,11 @@ export default function ReadAloudControl({ editor }) {
   }, [cleanupAudio, clearWordHighlight])
 
   const read = useCallback(async () => {
+    if (modelState === 'missing' || modelState === 'downloading') {
+      setOpen(true)
+      return
+    }
+
     const payload = getReadableEditorPayload(editor)
     if (!payload.text) {
       setStatus('error')
@@ -467,7 +495,7 @@ export default function ReadAloudControl({ editor }) {
     cleanupAudio()
     clearWordHighlight(false)
     setStatus('loading')
-    setMessage('Preparing Kokoro...')
+    setMessage('Getting the voice ready…')
     setOpen(true)
 
     try {
@@ -482,12 +510,7 @@ export default function ReadAloudControl({ editor }) {
           voice,
           onPhase: (label) => {
             if (!shouldReportProgress || requestIdRef.current !== requestId) return
-            setMessage(chunks.length === 1 ? label : `${label} ${index + 1}/${chunks.length}`)
-          },
-          onProgress: (progress) => {
-            if (!shouldReportProgress || requestIdRef.current !== requestId) return
-            const label = formatProgress(progress)
-            if (label) setMessage(label)
+            setMessage(label)
           },
         })
 
@@ -508,12 +531,12 @@ export default function ReadAloudControl({ editor }) {
         if (requestIdRef.current !== requestId) return
 
         setStatus('loading')
-        setMessage(index === 0 ? 'Preparing Kokoro...' : `Preparing chunk ${index + 1}/${chunks.length}`)
+        setMessage(index === 0 ? 'Getting the voice ready…' : `Preparing ${index + 1} of ${chunks.length}`)
         queueAudioAhead(index)
 
         if (useSystemSpeechRef.current) {
           setStatus('playing')
-          setMessage(chunks.length === 1 ? 'Reading with system voice' : `System voice ${index + 1}/${chunks.length}`)
+          setMessage(chunks.length === 1 ? 'Reading with the system voice' : `System voice ${index + 1} of ${chunks.length}`)
           await playSystemSpeechChunk(chunks[index].text, requestId, chunks[index].words)
           continue
         }
@@ -524,16 +547,16 @@ export default function ReadAloudControl({ editor }) {
           if (requestIdRef.current !== requestId) return
 
           setStatus('playing')
-          setMessage(chunks.length === 1 ? 'Reading aloud' : `Reading ${index + 1}/${chunks.length}`)
+          setMessage(chunks.length === 1 ? 'Reading aloud' : `Reading ${index + 1} of ${chunks.length}`)
           queueAudioAhead(index + 1)
           await playAudioChunk(audio, requestId, chunks[index].words)
         } catch (error) {
-          if (!isKokoroGenerationTimeoutError(error)) throw error
+          if (!shouldUseSystemSpeech(error)) throw error
           if (requestIdRef.current !== requestId) return
 
           useSystemSpeechRef.current = true
           setStatus('playing')
-          setMessage('Kokoro stalled, using system voice')
+          setMessage('Reading with the system voice')
           await playSystemSpeechChunk(chunks[index].text, requestId, chunks[index].words)
         }
       }
@@ -549,10 +572,16 @@ export default function ReadAloudControl({ editor }) {
       activeReadChunksRef.current = null
       cleanupAudio()
       clearWordHighlight()
+      if (isModelNotInstalledError(error)) {
+        setModelState('missing')
+        setStatus('idle')
+        setMessage('')
+        return
+      }
       setStatus('error')
       setMessage(error?.message || String(error))
     }
-  }, [cleanupAudio, clearWordHighlight, editor, playAudioChunk, playSystemSpeechChunk, voice])
+  }, [cleanupAudio, clearWordHighlight, editor, modelState, playAudioChunk, playSystemSpeechChunk, voice])
 
   const active = status === 'loading' || status === 'playing'
 
@@ -566,35 +595,72 @@ export default function ReadAloudControl({ editor }) {
     run: active ? stop : read,
   }], [active, editor, read, stop])
   const selectedVoice = READ_ALOUD_VOICES.find((option) => option.id === voice)
-  const voiceGroups = ['American', 'British'].flatMap((language) => ['Female', 'Male'].map((gender) => ({
-    label: `${language} ${gender.toLowerCase()}`,
-    options: READ_ALOUD_VOICES
-      .filter((option) => option.language === language && option.gender === gender)
-      .map((option) => ({ value: option.id, label: `${option.name} (${option.grade})` })),
-  })))
+  const voiceItems = READ_ALOUD_VOICES.map((option) => ({
+    text: option.name,
+    checked: option.id === voice,
+    action: () => setVoice(option.id),
+  }))
+  const needsDownload = modelState === 'missing' || modelState === 'downloading'
+  const statusText = modelState === 'downloading'
+    ? formatDownloadProgress(downloadProgress)
+    : message || (modelState === 'missing' ? SPEECH_DOWNLOAD_SIZE : active ? 'Preparing…' : '')
+  const close = () => { setOpen(false); setChoosingVoice(false) }
   const popover = (
-    <Popover open={open} anchorRef={buttonRef} onClose={() => setOpen(false)} align="end" eyebrow="Read aloud" className={`read-aloud-popover ${status}`}>
-      <div className="read-aloud-head">
-        <p className="ib-meta read-aloud-voice">
-          {selectedVoice ? `${selectedVoice.name} · ${selectedVoice.language} ${selectedVoice.gender}` : 'Choose a voice'}
-        </p>
-        <div className="read-aloud-wave" aria-hidden="true">
-          {levels.map((level, index) => (
-            <span
-              key={READ_ALOUD_BAR_KEYS[index]}
-              className="read-aloud-wave-bar"
-              style={{ '--bar-height': `${6 + level * 24}px` }}
-            />
-          ))}
+    <Popover open={open} anchorRef={buttonRef} onClose={close} align="end" eyebrow="Read aloud" className={`read-aloud-popover ${status}`}>
+      {choosingVoice ? (
+        <MenuRow label="Read aloud voice" items={voiceItems} onDone={() => setChoosingVoice(false)} className="tb-strip" />
+      ) : needsDownload ? (
+        <div className="toolbar-group read-aloud-row">
+          <button
+            type="button"
+            className="read-aloud-download"
+            disabled={modelState === 'downloading'}
+            title={modelState === 'downloading' ? 'Downloading the voices' : 'Download the voices Read Aloud uses, once. They stay on this device.'}
+            onClick={downloadVoices}
+          >
+            <Icon name="download" />
+            <span className="tb-text">Download voices</span>
+          </button>
+          <span className={`ib-meta read-aloud-status${status === 'error' ? ' is-error' : ''}`} role="status" aria-live="polite" title={statusText || undefined}>
+            {statusText}
+          </span>
         </div>
-      </div>
-      <Field label="Voice">
-        <SelectMenu label="Read aloud voice" value={voice} onChange={setVoice} disabled={active} options={voiceGroups} />
-      </Field>
-      <p className={`ib-hint read-aloud-status${status === 'error' ? ' is-error' : ''}`}>
-        {message || (active ? 'Preparing…' : 'Reads the selection, or the whole document.')}
-      </p>
-      <Button variant="filled" className="read-aloud-action" onClick={active ? stop : read}>{active ? 'Stop' : 'Read'}</Button>
+      ) : (
+        <div className="toolbar-group read-aloud-row">
+          <button
+            type="button"
+            className={active ? 'active' : undefined}
+            aria-label={active ? 'Stop reading' : 'Read aloud'}
+            title={active ? 'Stop' : 'Read the selection, or the whole document'}
+            onClick={active ? stop : read}
+          >
+            <Icon name={active ? 'stop' : 'play'} active={active} />
+          </button>
+          <div className="read-aloud-wave" aria-hidden="true">
+            {levels.map((level, index) => (
+              <span
+                key={READ_ALOUD_BAR_KEYS[index]}
+                className="read-aloud-wave-bar"
+                style={{ '--bar-height': `${3 + level * 14}px` }}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            className="read-aloud-voice"
+            disabled={active}
+            aria-label={`Voice: ${selectedVoice?.name ?? 'choose one'}`}
+            title={selectedVoice ? `Voice: ${selectedVoice.name}` : 'Choose a voice'}
+            onClick={() => setChoosingVoice(true)}
+          >
+            <Icon name="voice" />
+            <span className="tb-text">{selectedVoice?.name ?? 'Voice'}</span>
+          </button>
+          <span className={`ib-meta read-aloud-status${status === 'error' ? ' is-error' : ''}`} role="status" aria-live="polite" title={statusText || undefined}>
+            {statusText}
+          </span>
+        </div>
+      )}
     </Popover>
   )
 
@@ -604,7 +670,7 @@ export default function ReadAloudControl({ editor }) {
         ref={buttonRef}
         type="button"
         className={`read-aloud-btn${active ? ' active' : ''}${status === 'loading' ? ' loading' : ''}${status === 'error' ? ' error' : ''}`}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => (open ? close() : setOpen(true))}
         aria-expanded={open}
         aria-label="Read aloud options"
         title="Read aloud"
