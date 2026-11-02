@@ -31,9 +31,9 @@ export const REFERENCES_CHANGED_EVENT = 'references:changed'
 /** The lock key the library is written under — not a document name anyone can make. */
 const LIBRARY_LOCK = '\u0000references'
 
-export const DEFAULT_BIBLIOGRAPHY = { include: 'cited', annotated: false, inPrint: true }
+const DEFAULT_BIBLIOGRAPHY = { include: 'cited', annotated: false, inPrint: true }
 
-export const newReferenceId = () => `ref-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+const newReferenceId = () => `ref-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
 const emptyLibrary = () => ({ version: 1, defaultStyle: DEFAULT_STYLE, references: [], attachments: {} })
 
@@ -82,7 +82,7 @@ export function normalizeReference(raw = {}) {
 export const settledStatus = (ref) => (missingFields(ref.kind, ref.fields).length ? 'incomplete' : 'complete')
 
 /** Apply a `ReferencePatch`: present keys replace, `fields` merges, '' removes a field. */
-export function applyPatch(ref, patch = {}) {
+function applyPatch(ref, patch = {}) {
   const next = { ...ref, updatedAt: now() }
   if (patch.kind) next.kind = kindSpec(patch.kind).id
   if (Array.isArray(patch.contributors)) next.contributors = patch.contributors
@@ -145,7 +145,7 @@ async function updateLibraryAt(root, projectName, change, detail = {}) {
   return changed
 }
 
-export const updateLibrary = async (projectName, change, detail) => (
+const updateLibrary = async (projectName, change, detail) => (
   projectName ? updateLibraryAt(await getProjectRoot(projectName), projectName, change, detail) : false
 )
 

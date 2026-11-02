@@ -106,7 +106,7 @@ const MARGIN_SHARE: Record<ReaderMargins, number> = { narrow: 0.04, normal: 0.07
 const MARGIN_TOP_SHARE = 0.05
 
 /** The body text's size before the reader scales it. */
-export const READER_BASE_PX = 18
+const READER_BASE_PX = 18
 
 /**
  * The CSS that lays the book out as a reading system does — in pages, as columns one

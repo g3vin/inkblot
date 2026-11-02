@@ -21,7 +21,7 @@ import type { Loose } from '../types'
 export const MIN_WIDTH = 240
 export const DEFAULT_WIDTH = 360
 export const MAX_SNAPSHOT_WIDTH = 720
-export const VALID_ALIGNMENTS = new Set(['left', 'center', 'right'])
+const VALID_ALIGNMENTS = new Set(['left', 'center', 'right'])
 
 /** How the tile sits in the paragraph flow. */
 export type Alignment = 'left' | 'center' | 'right'
@@ -184,7 +184,7 @@ export const normalizeAlignment = (value: unknown): Alignment => (
   VALID_ALIGNMENTS.has(value as string) ? value as Alignment : 'left'
 )
 
-export const normalizeReceiptStatus = (value: unknown): ReceiptStatus => (
+const normalizeReceiptStatus = (value: unknown): ReceiptStatus => (
   Object.prototype.hasOwnProperty.call(MESSAGE_RECEIPT_LABELS, value as string)
     ? value as ReceiptStatus
     : ''
@@ -210,7 +210,7 @@ export const measureTextWidth = (text: string = '', font: string = '15px sans-se
   return context.measureText(text).width
 }
 
-export const normalizeMessage = (
+const normalizeMessage = (
   message: StoredMessage = {},
   participants: Participants = DEFAULT_PARTICIPANTS,
 ): Message => {

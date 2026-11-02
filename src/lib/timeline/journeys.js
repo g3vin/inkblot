@@ -33,7 +33,7 @@ const mapPaths = (node, out = []) => {
  * intervals: [{ kind, from, to, legId, label }] }]`. The last stay, which runs to
  * Infinity on the map, is cut at the traveller's last movement plus a day.
  */
-export function mapJourneys(map, mapPath) {
+function mapJourneys(map, mapPath) {
   const space = createSpace(map)
   const pins = new Map(map.pins.map((pin) => [pin.id, pin]))
   const placeName = (id) => (pins.has(id) ? pinLabel(pins.get(id)) || 'a place' : 'somewhere')

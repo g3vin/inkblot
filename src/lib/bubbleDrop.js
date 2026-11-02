@@ -12,10 +12,10 @@ import { project, velocityFrom } from '../ui/physics.js'
  * How deep the shelf along the top is: a drop this close to the top sets the bubble
  * aside. The editor keeps the sentence out of it (`--bubble-shelf`, BubbleEditor.css).
  */
-export const SHELF_DEPTH = 88
+const SHELF_DEPTH = 88
 /** How far a set-aside bubble rests from the top and sides of the editor. */
 export const SHELF_MARGIN = 18
-export const ROW_GAP = 12
+const ROW_GAP = 12
 
 export const findBubble = (present, id) =>
   present.words.find((word) => word.id === id) ?? present.aside.find((word) => word.id === id) ?? null
@@ -59,7 +59,7 @@ export const inside = (rect, x, y, pad = 0) =>
   x >= rect.left - pad && x <= rect.right + pad && y >= rect.top - pad && y <= rect.bottom + pad
 
 /** How close two bubbles' edges must come to count as touching. */
-export const TOUCH_SLACK = 4
+const TOUCH_SLACK = 4
 
 /**
  * The bubble a dragged bubble is touching, which a drop joins it to — or null.
@@ -87,7 +87,7 @@ export const touchTarget = (rect, items) => {
 }
 
 /** How far past a gap's edges a pinch still counts as over it. */
-export const GAP_REACH = 16
+const GAP_REACH = 16
 
 /**
  * The gap in the sentence a point is over, as the index of the bubble before it — or
@@ -181,7 +181,7 @@ export const velocityOf = (samples, at = samples[samples.length - 1]?.t) => velo
 /* ---------------- throwing ---------------- */
 
 /** A release whose projection lands this far from the pointer is a throw. */
-export const THROW_REACH = 160
+const THROW_REACH = 160
 
 /**
  * Where a bubble released at `point` moving at `velocity` (px/ms) lands, when that is a
@@ -203,10 +203,10 @@ export const SWIPE_DISTANCE = 140
 /** Movement before a two-finger gesture is judged sideways or not. */
 export const SWIPE_LOCK = 12
 /** A flick turns the page short of the distance: this fast (px/ms) at the end, this far. */
-export const FLICK_SPEED = 0.45
-export const FLICK_DISTANCE = 36
+const FLICK_SPEED = 0.45
+const FLICK_DISTANCE = 36
 /** How far back in a gesture its speed at the end is measured. */
-export const FLICK_WINDOW_MS = 100
+const FLICK_WINDOW_MS = 100
 
 /**
  * Which way the form turns when a sideways swipe ends: +1 to the next form (the fingers

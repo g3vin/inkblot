@@ -9,12 +9,12 @@ import { normalizePinterestBoardUrl } from '../lib/pinterestBoard'
 import { getSessionValue, setSessionValue } from '../lib/preferences'
 import { getProjectOpenId as readProjectOpenId } from '../lib/projectContext'
 
-export const PINTEREST_CACHE_PREFIX = 'inkblot:pinterest-preview:'
-export const PINTEREST_PROJECT_REFRESH_PREFIX = 'inkblot:pinterest-project-refresh:'
+const PINTEREST_CACHE_PREFIX = 'inkblot:pinterest-preview:'
+const PINTEREST_PROJECT_REFRESH_PREFIX = 'inkblot:pinterest-project-refresh:'
 
 export const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
 
-export const getPinterestCacheKey = (url) => {
+const getPinterestCacheKey = (url) => {
   const normalized = normalizePinterestBoardUrl(url)
   if (!normalized) return null
   return `${PINTEREST_CACHE_PREFIX}${normalized}`
@@ -26,9 +26,9 @@ export const getPinterestCacheKey = (url) => {
  * Read from `lib/projectContext`, because a node view has no React path back to the
  * component that knows.
  */
-export const getProjectOpenId = () => readProjectOpenId()
+const getProjectOpenId = () => readProjectOpenId()
 
-export const getProjectRefreshKey = (url) => {
+const getProjectRefreshKey = (url) => {
   const cacheKey = getPinterestCacheKey(url)
   if (!cacheKey) return null
   return `${PINTEREST_PROJECT_REFRESH_PREFIX}${getProjectOpenId()}:${cacheKey}`

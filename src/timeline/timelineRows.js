@@ -11,12 +11,12 @@ import { eventMatchesFilter, eventById } from '../lib/timeline/timelineModel'
 /** The lane names' column, left of the plot. */
 export const GUTTER = 168
 export const ROW_HEIGHT = 30
-export const LANE_GAP = 10
+const LANE_GAP = 10
 export const LANE_HEADER = 22
 export const NO_LANE = ''
 
 /** A bar's least width on screen: a dot for a point, room for some of its title. */
-export const itemMinWidth = (title) => Math.min(220, 28 + String(title || '').length * 6.4)
+const itemMinWidth = (title) => Math.min(220, 28 + String(title || '').length * 6.4)
 
 function pack(items, toX) {
   const rowEnds = []

@@ -46,7 +46,7 @@ export interface TypesetEntry {
 const NOT_TYPESET = new Set(['folder', 'title', 'author', 'language'])
 
 /** Automatic entries a book keeps; named ones and exports are kept however many. */
-export const AUTO_CAP = 60
+const AUTO_CAP = 60
 
 /** A chapter's typesetting, from its content. */
 export const chapterTypesetOf = (content: PMJSON | null | undefined): ChapterTypeset => {

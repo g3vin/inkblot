@@ -112,7 +112,7 @@ export const paragraphsOf = (value: string, { linePerParagraph = false } = {}): 
 }
 
 /** The pages after the last chapter, each a chapter of its own under its heading. */
-export const backMatterChapters = (back: Partial<BackMatter> | null | undefined, author = ''): CompiledChapter[] => {
+const backMatterChapters = (back: Partial<BackMatter> | null | undefined, author = ''): CompiledChapter[] => {
   const out: CompiledChapter[] = []
   const add = (title: string, body: string | undefined, options = {}) => {
     if (!body?.trim()) return
@@ -305,7 +305,7 @@ export const legacyMatterContent = (
 }
 
 /** A part's divider: its number and its title, as one heading — or, designed, as a head. */
-export const partContent = (label: string | null, title: string, design?: ChapterDesign | null): Doc => {
+const partContent = (label: string | null, title: string, design?: ChapterDesign | null): Doc => {
   if (design) {
     const head = chapterHeadFor({ ...design, showNumber: true, showTitle: true }, { label, title: title === label ? '' : title })
     return { type: 'doc', attrs: { bookPart: true }, content: [{ type: 'chapterHead', attrs: { head } }] }

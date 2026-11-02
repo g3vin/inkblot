@@ -27,14 +27,13 @@
  */
 import { newId } from '../map/mapModel'
 
-export { newId }
 
-export const TIMELINE_FORMAT_VERSION = 1
+const TIMELINE_FORMAT_VERSION = 1
 
-export const LINK_KINDS = ['text', 'mapLeg', 'canvas', 'note']
+const LINK_KINDS = ['text', 'mapLeg', 'canvas', 'note']
 
 /** Ink ids (src/lib/palette.ts) handed out to new lanes, tags and eras in turn. */
-export const LANE_COLORS = ['blue', 'rust', 'green', 'violet', 'amber', 'red', 'teal', 'slate']
+const LANE_COLORS = ['blue', 'rust', 'green', 'violet', 'amber', 'red', 'teal', 'slate']
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
 const string = (value, fallback = '') => (typeof value === 'string' ? value : fallback)
@@ -84,7 +83,7 @@ function appendKey(a) {
 }
 
 /** `count` keys in order, after `a` and before `b`. */
-export function keysBetween(a, b, count) {
+function keysBetween(a, b, count) {
   const keys = []
   let previous = a
   for (let index = 0; index < count; index += 1) {
@@ -94,7 +93,7 @@ export function keysBetween(a, b, count) {
   return keys
 }
 
-export const compareKeys = (a, b) => (a < b ? -1 : a > b ? 1 : 0)
+const compareKeys = (a, b) => (a < b ? -1 : a > b ? 1 : 0)
 
 /* ---------------- reading raw JSON ---------------- */
 
@@ -119,7 +118,7 @@ function readEra(raw, nextId) {
 }
 
 /** What on a map an event can be at, besides a place (a pin). */
-export const PLACE_ITEM_KINDS = ['region', 'route', 'label', 'body']
+const PLACE_ITEM_KINDS = ['region', 'route', 'label', 'body']
 
 /**
  * Where on a map an event's `place` is: `{ map, kind, id }` (kind `pin` for the
@@ -168,7 +167,7 @@ function readLink(raw) {
 }
 
 /** A link's identity: two links with the same key are the same link. */
-export const linkKey = (link) => {
+const linkKey = (link) => {
   switch (link.kind) {
     case 'text': return `text|${link.doc}`
     case 'mapLeg': return `mapLeg|${link.map}|${link.traveler}|${link.leg}`
@@ -273,7 +272,7 @@ export const sortedEvents = (timeline) => [...timeline.events].sort((a, b) => co
 export const eventById = (timeline, id) => timeline.events.find((event) => event.id === id) || null
 
 export const isDated = (event) => event.start !== null
-export const eventEnd = (event) => (event.end ?? event.start)
+const eventEnd = (event) => (event.end ?? event.start)
 
 /**
  * Where every event sits, for drawing: `{ id, index, start, end, dated }` in sequence.
@@ -596,13 +595,13 @@ export const removeEra = (timeline, id) => ({ ...timeline, eras: timeline.eras.f
  * A timeline view (`<name>.timeline.json`): how one document shows the chronology.
  * It holds no events — only the scale, the zoom, what is filtered and how lanes sit.
  */
-export const TIMELINE_VIEW_TYPE = 'timeline-view'
+const TIMELINE_VIEW_TYPE = 'timeline-view'
 
 /**
  * How a view lays the chronology out: along dates, evenly in sequence, or as the
  * manuscript — passages in reading order, each joined to when it happens.
  */
-export const TIMELINE_SCALES = ['time', 'sequence', 'manuscript']
+const TIMELINE_SCALES = ['time', 'sequence', 'manuscript']
 
 /**
  * @param {unknown} raw

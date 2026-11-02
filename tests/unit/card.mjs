@@ -2,8 +2,7 @@
  * The canvas card's TipTap schema: every mark and node the Toolbar can apply must exist
  * in it, and stored content must parse against it.
  */
-const S = '../../src'
-const { getCardSchema, getCardExtensions, buildCardExtensions } = await import(`${S}/lib/editorExtensions.js`)
+const { getCardSchema, getCardExtensions, buildCardExtensions } = await import('../../src/lib/editorExtensions.js')
 import { ok } from './assert.mjs'
 
 const schema = getCardSchema()

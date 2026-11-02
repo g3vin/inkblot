@@ -30,34 +30,34 @@ import { springTransition } from '../ui/useSpring.js'
 const CLICK_SNAP = 'var(--spring-quick-dur) var(--spring-quick)'
 
 /** Travel before a gesture is read as a swipe or a scroll. */
-export const SWIPE_LOCK_PX = 6
+const SWIPE_LOCK_PX = 6
 /** How much more sideways than up-and-down a gesture must be to swipe. */
-export const SWIPE_HORIZONTAL_BIAS = 1.2
+const SWIPE_HORIZONTAL_BIAS = 1.2
 /**
  * Finger speed at the lift, in px/ms, that carries on to the next panel: a speed
  * threshold, as iOS pages, rather than a projection, which would carry a slow drift
  * over too. Above GESTURE.flick because macOS speeds a trackpad's scroll deltas up.
  */
-export const SWIPE_FLICK_VELOCITY = 0.5
+const SWIPE_FLICK_VELOCITY = 0.5
 /** The stretch of the gesture its lift speed is measured over. */
-export const SWIPE_VELOCITY_WINDOW_MS = 80
+const SWIPE_VELOCITY_WINDOW_MS = 80
 /** Without phases, a pause this long is taken for the lift. */
 export const SWIPE_IDLE_END_MS = 120
 /** How long a swipe is held before it may travel past the next panel. */
-export const SWIPE_HOLD_MS = 220
+const SWIPE_HOLD_MS = 220
 /**
  * A landing this soon after the tick for the same panel is felt as one with it: a fast
  * swipe ticks onto the panel and lifts a moment later, and two taps that close read as
  * a stutter, so the landing's is dropped.
  */
-export const SWIPE_ONE_TAP_MS = 150
+const SWIPE_ONE_TAP_MS = 150
 /** Used when the sidebar's width is not known. */
 const FALLBACK_PIXELS_PER_PANEL = 240
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
 /** The furthest, in panels, a swipe stretches past the first or last. */
-export const SWIPE_RUBBER_BAND = 0.3
+const SWIPE_RUBBER_BAND = 0.3
 
 /** Past either end the panels give, less and less, never past SWIPE_RUBBER_BAND. */
 export const rubberBand = (position, count) => {
@@ -94,7 +94,7 @@ export const committedIndex = (position, origin, commitAt = 0.5) => {
  * moment: AppKit's phase crosses the bridge after the deltas it ends. A longer gap is
  * the fingers resting on the trackpad before they lift, which slows the swipe.
  */
-export const SWIPE_LIFT_LATENCY_MS = 48
+const SWIPE_LIFT_LATENCY_MS = 48
 
 /**
  * The fingers' speed over the last moments of the gesture, in px/ms, as they were at

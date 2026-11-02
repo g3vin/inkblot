@@ -4,7 +4,7 @@
  */
 
 /** A stable number in [-1, 1) from a string, so a sheet's turn is the same every time. */
-export function tiltOf(key) {
+function tiltOf(key) {
   let hash = 2166136261
   for (let i = 0; i < key.length; i += 1) {
     hash ^= key.charCodeAt(i)

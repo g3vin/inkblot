@@ -13,7 +13,7 @@
  * so the landing page draws its piles on its first frame.
  */
 import { observeEntries, remapKeys } from './entryOperations'
-import { getPreference, setPreference } from './preferences'
+import { getObjectPreference, setPreference } from './preferences'
 
 const KEY = 'inkblot.landing.excerpts'
 const VERSION = 1
@@ -84,12 +84,7 @@ const listeners = new Set()
 
 const load = () => {
   if (state) return state
-  try {
-    const stored = JSON.parse(getPreference(KEY) || '{}')
-    state = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {}
-  } catch {
-    state = {}
-  }
+  state = getObjectPreference(KEY)
   return state
 }
 
@@ -144,7 +139,7 @@ export function dropProjectExcerpts(projectName) {
 }
 
 /** Follow an entry renamed, moved or deleted (`nextPath` null) in the tree. */
-export function remapExcerpts(projectName, entryPath, nextPath, type) {
+function remapExcerpts(projectName, entryPath, nextPath, type) {
   const all = load()
   const project = all[projectName]
   if (!project) return
@@ -159,12 +154,6 @@ export function pruneExcerpts(projectNames) {
   const stale = Object.keys(all).filter((name) => !keep.has(name))
   if (!stale.length) return
   commit(Object.fromEntries(Object.entries(all).filter(([name]) => keep.has(name))))
-}
-
-/** For tests: start again from what the preferences hold. */
-export function resetExcerptsForTests() {
-  state = null
-  window.clearTimeout(saveTimer)
 }
 
 let observing = null

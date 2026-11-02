@@ -28,6 +28,8 @@ jobs:
       - run: npm run lint
       - run: npm run lint:design
       - run: npm run lint:size
+      - run: npm run lint:unused
+      - run: npm run lint:dupes
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

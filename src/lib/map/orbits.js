@@ -23,7 +23,7 @@
  * out the same way.
  */
 
-export const DAYS_PER_YEAR = 365.256363
+const DAYS_PER_YEAR = 365.256363
 /** Default masses, in suns, for a body that does not say. */
 const DEFAULT_MASS = { star: 1, planet: 3.003e-6, dwarf: 2e-9, moon: 3.69e-8, belt: 0, station: 0, barycenter: 0 }
 const KEPLER_STEPS = 16
@@ -75,7 +75,7 @@ export function solveKepler(meanAnomaly, e) {
  * in the system: turned by the periapsis angle, tipped by the inclination about the
  * line of nodes, then turned to the ascending node.
  */
-export function orbitToSystem(orbit, x, y) {
+function orbitToSystem(orbit, x, y) {
   const w = (orbit.periapsisDeg || 0) * RAD
   const xw = x * Math.cos(w) - y * Math.sin(w)
   const yw = x * Math.sin(w) + y * Math.cos(w)

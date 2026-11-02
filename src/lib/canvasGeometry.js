@@ -13,8 +13,8 @@
  * Mirrors: `src-tauri/crates/inkblot-core/src/canvas_geometry.rs`; `npm run parity` asserts they agree.
  */
 
-export const MIN_ZOOM = 0.1
-export const MAX_ZOOM = 4
+const MIN_ZOOM = 0.1
+const MAX_ZOOM = 4
 
 export const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 

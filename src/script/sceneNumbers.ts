@@ -15,7 +15,7 @@ export const readSceneNumbers = (doc: { attrs?: Record<string, unknown> } | null
 export const NUMBERED_ELEMENTS = new Set(['sceneHeading'])
 
 /** "12" → "12A" → "12B"…; "12Z" → "12ZA". */
-export const nextLetter = (label: string): string => {
+const nextLetter = (label: string): string => {
   const m = /^(\d+)([A-Z]*)$/.exec(label)
   if (!m) return `${label}A`
   const letters = m[2]

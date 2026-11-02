@@ -16,7 +16,7 @@ const classes = (...names) => names.filter(Boolean).join(' ')
 /**
  * A panel's own control, bare on its paper. `round` for a single round button.
  */
-export const Inlay = forwardRef(function Inlay({ round = false, className, children, ...rest }, ref) {
+export const Inlay = forwardRef(({ round = false, className, children, ...rest }, ref) => {
   return (
     <div ref={ref} className={classes('ib-inlay', round && 'ib-inlay--round', className)} {...rest}>
       {children}
@@ -27,7 +27,7 @@ export const Inlay = forwardRef(function Inlay({ round = false, className, child
 /**
  * A row of pieces: lay Inlays out inside it (it is a flex row), a kerf apart.
  */
-export const InlaySlot = forwardRef(function InlaySlot({ className, children, ...rest }, ref) {
+export const InlaySlot = forwardRef(({ className, children, ...rest }, ref) => {
   return (
     <div ref={ref} className={classes('ib-inlay-slot', className)} {...rest}>
       {children}

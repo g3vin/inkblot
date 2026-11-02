@@ -524,7 +524,7 @@ export default function FocusModeOverlay({ editor, onExit, leaving = false, onEx
     const overlay = overlayRef.current
     const current = modelRef.current
     if (!column || !overlay || !current) return
-    let delta = -pendingDeltaRef.current
+    const delta = -pendingDeltaRef.current
     pendingDeltaRef.current = 0
 
     const first = elementFor(0)

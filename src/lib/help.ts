@@ -590,12 +590,12 @@ export const helpTopic = (id: string | null | undefined): HelpTopic | undefined 
 /** Asks the Help sheet to open, on a topic if one is given. */
 export const OPEN_HELP_EVENT = 'inkblot:open-help'
 
-export function openHelp(topic?: string) {
+function openHelp(topic?: string) {
   window.dispatchEvent(new CustomEvent(OPEN_HELP_EVENT, { detail: { topic } }))
 }
 
 /** The help topic for whatever is under a right-click, if anything there has one. */
-export function helpTopicAt(target: EventTarget | null): HelpTopic | undefined {
+function helpTopicAt(target: EventTarget | null): HelpTopic | undefined {
   if (!(target instanceof Element)) return undefined
   return helpTopic(target.closest('[data-help]')?.getAttribute('data-help'))
 }

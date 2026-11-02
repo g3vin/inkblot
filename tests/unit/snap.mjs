@@ -4,9 +4,8 @@
  * Worth testing headlessly because it is invisible when subtly wrong — a card that
  * lands one pixel off looks like a rendering artifact, not a bug in a pure function.
  */
-const C = '../../src'
-const { computeSnap, snapCandidates, SNAP_THRESHOLD_PX } = await import(`${C}/canvas/useCanvasSnapping.js`)
-const { createEmptyCanvas, makeTextNode, makeGroupNode } = await import(`${C}/lib/canvasModel.js`)
+const { computeSnap, snapCandidates, SNAP_THRESHOLD_PX } = await import('../../src/canvas/useCanvasSnapping.js')
+const { createEmptyCanvas, makeTextNode, makeGroupNode } = await import('../../src/lib/canvasModel.js')
 import { ok } from './assert.mjs'
 
 const rect = (x, y, width = 100, height = 100) => ({ x, y, width, height })

@@ -53,7 +53,7 @@ impl ScrapeChannels {
         let mut slots = self
             .slots
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         slots.insert(request_id, Arc::new(ScrapeSlot::default()));
     }
 
@@ -82,7 +82,7 @@ impl ScrapeChannels {
         *slot
             .report
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(report);
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(report);
         slot.notify.notify_waiters();
     }
 
@@ -107,7 +107,7 @@ impl ScrapeChannels {
                 if let Some(report) = slot
                     .report
                     .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .take()
                 {
                     return report;

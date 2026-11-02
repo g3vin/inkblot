@@ -60,7 +60,7 @@ const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"'
  * A formatted citation or bibliography entry (`format.js` `tidy`: only i, b, sup, sub
  * and small caps) as Markdown. Superscripts stay as <sup>, which Markdown passes through.
  */
-export const citationMarkdown = (html: string): string => String(html || '')
+const citationMarkdown = (html: string): string => String(html || '')
   .replace(/<\/?(i|em)>/g, '*')
   .replace(/<\/?(b|strong)>/g, '**')
   .replace(/<(\/?)(sup|sub)>/g, '<$1$2>')

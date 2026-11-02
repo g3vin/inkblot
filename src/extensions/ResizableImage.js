@@ -506,7 +506,7 @@ const ResizableImage = Image.extend({
         const onPointerMove = (moveEvent) => {
           const deltaX = (moveEvent.clientX - startX) / rect.width
           const deltaY = (moveEvent.clientY - startY) / rect.height
-          let next = { ...startCrop }
+          const next = { ...startCrop }
 
           if (mode === 'move') {
             next.cropX = clamp(startCrop.cropX + deltaX, 0, 1 - startCrop.cropWidth)

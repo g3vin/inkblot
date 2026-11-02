@@ -14,9 +14,8 @@ import { DEFAULT_ACCENT, DEFAULT_TRAY, normalizeAccent, normalizeTray } from './
 import type { ChromeInkId } from './palette'
 
 export type ResolvedTheme = 'light' | 'dark' | 'midnight'
-export type ThemeChoice = ResolvedTheme | 'system'
 
-export function systemTheme(): 'light' | 'dark' {
+function systemTheme(): 'light' | 'dark' {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches
     ? 'dark'
     : 'light'

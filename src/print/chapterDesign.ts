@@ -32,7 +32,7 @@ const objectOr = <T extends object>(value: unknown): Partial<T> => (
 )
 
 /** A stored design with anything missing filled in. */
-export const normalizeChapterDesign = (value: unknown): ChapterDesign => {
+const normalizeChapterDesign = (value: unknown): ChapterDesign => {
   const stored = objectOr<ChapterDesign>(value)
   const design = { ...DEFAULT_CHAPTER_DESIGN, ...stored }
   const width = Number(design.imageWidthPct)
@@ -97,7 +97,7 @@ export const activeCoverOf = (book: Partial<BookSettings> | null | undefined): C
 }
 
 /** The book's cover versions changed, with `coverImage` following the active front. */
-export const withCovers = <B extends Partial<BookSettings>>(book: B, covers: CoverSet[], activeCover?: string): B => {
+const withCovers = <B extends Partial<BookSettings>>(book: B, covers: CoverSet[], activeCover?: string): B => {
   const active = covers.find((c) => c.id === activeCover) || covers[0]
   const out: B = { ...book, covers, activeCover: active?.id }
   if (!active) delete out.activeCover

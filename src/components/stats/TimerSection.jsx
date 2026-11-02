@@ -9,7 +9,7 @@ import { segmentTitle } from '../../stats/routines.js'
 import { formatDuration, formatNumber } from '../../stats/day.js'
 import { routineOptions, routinePlan, timerClock, timerWords } from './statsText.js'
 
-export function RunningTimer({ stats }) {
+function RunningTimer({ stats }) {
   const timer = stats.timer
   const segment = timer.segment
   if (!segment) return null
@@ -32,7 +32,7 @@ export function RunningTimer({ stats }) {
   )
 }
 
-export function TimerControls({ stats }) {
+function TimerControls({ stats }) {
   const timer = stats.timer
   const segment = timer.segment
   return (

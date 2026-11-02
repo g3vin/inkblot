@@ -14,7 +14,7 @@
 const FAMILIES = {}
 
 /** `modals:1B,3C` → { modals: { 1: 'B', 3: 'C' } }. */
-export function parseVariant(value) {
+function parseVariant(value) {
   const out = {}
   for (const part of String(value || '').split(';')) {
     const [family, list = ''] = part.split(':')

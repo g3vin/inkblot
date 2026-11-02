@@ -11,7 +11,7 @@
  */
 import { getPreference, setPreference } from './preferences'
 
-export const RELEASES_REPO = 'g3vin/inkblot'
+const RELEASES_REPO = 'g3vin/inkblot'
 export const RELEASES_URL = `https://github.com/${RELEASES_REPO}/releases`
 export const LAST_SEEN_VERSION_KEY = 'inkblot-last-seen-version'
 

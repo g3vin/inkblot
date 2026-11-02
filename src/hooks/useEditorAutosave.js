@@ -35,7 +35,7 @@ const HISTORY_CHECKPOINT_DEBOUNCE_MS = 15000
  * on receipt, so an edit dispatched right after the event is not in it. Resolving a
  * bubble session sends it: history is the only way back to a resolved session.
  */
-export const VERSION_CHECKPOINT_EVENT = 'inkblot:version-checkpoint'
+const VERSION_CHECKPOINT_EVENT = 'inkblot:version-checkpoint'
 
 export function useEditorAutosave({
   activeDoc,

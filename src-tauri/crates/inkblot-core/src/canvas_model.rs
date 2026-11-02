@@ -176,7 +176,10 @@ fn finite_or(value: &Value, fallback: f64) -> f64 {
 /// fails this test is left in `extra`, so a node carrying `text: 42` still round-trips
 /// with its 42 rather than losing it.
 fn typed_string(object: &Map<String, Value>, key: &str) -> Option<String> {
-    object.get(key)?.as_str().map(|text| text.to_string())
+    object
+        .get(key)?
+        .as_str()
+        .map(std::string::ToString::to_string)
 }
 
 fn typed_side(object: &Map<String, Value>, key: &str) -> Option<EdgeSide> {

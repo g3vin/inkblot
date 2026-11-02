@@ -9,11 +9,11 @@
  * window is idle. Opening a project stops the queue: its loads come first.
  */
 import { statsService } from '../stats/service'
-import { getPreference, setPreference } from './preferences'
+import { getObjectPreference, setPreference } from './preferences'
 
 const KEY = 'inkblot.landing.summaries'
 const IDLE_GAP_MS = 200
-export const SUMMARY_STALE_MS = 6 * 60 * 60 * 1000
+const SUMMARY_STALE_MS = 6 * 60 * 60 * 1000
 
 /** @typedef {{ files: number, words: number, at: number }} ProjectSummary */
 
@@ -22,12 +22,7 @@ const listeners = new Set()
 
 const load = () => {
   if (state) return state
-  try {
-    const stored = JSON.parse(getPreference(KEY) || '{}')
-    state = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {}
-  } catch {
-    state = {}
-  }
+  state = getObjectPreference(KEY)
   return state
 }
 
@@ -48,7 +43,7 @@ export const summariesSnapshot = () => load()
 /** @returns {ProjectSummary | null} */
 export const summaryFor = (projectName) => load()[projectName] ?? null
 
-export function setSummary(projectName, files, words) {
+function setSummary(projectName, files, words) {
   if (!projectName) return
   const known = load()[projectName]
   if (known && known.files === files && known.words === words) {

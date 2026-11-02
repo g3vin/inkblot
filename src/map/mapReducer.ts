@@ -13,22 +13,13 @@
  * so a removal filters the collection and re-normalizes, and undo brings all of it
  * back as one step.
  */
+import { canRedo, canUndo, createHistory, withHistory } from '../lib/undoHistory'
+import type { ActionMeta } from '../lib/undoHistory'
 import { normalizeMap } from '../lib/map/mapModel'
 import type { MapCollection, StoredMap } from '../types'
 
-const HISTORY_LIMIT = 100
-
 /** The sections of a map that are one object rather than a list. */
 export type MapSection = 'scale' | 'background' | 'earth' | 'system' | 'surface' | 'galaxy' | 'universe' | 'model' | 'style' | 'timeline'
-
-export interface ActionMeta {
-  /** Loading a document is not an edit — it resets the stacks instead of pushing. */
-  silent?: boolean
-  /** Edits sharing a key collapse into the one history entry they started. */
-  coalesce?: string | null
-  /** Not the writer's edit (a linked document moved), so a locked document takes it too. */
-  upkeep?: boolean
-}
 
 type Item = { id: string } & Record<string, unknown>
 
@@ -58,20 +49,6 @@ export type MapDocAction = ({
   ids: string[]
 }) & { meta?: ActionMeta }
 
-export type MapHistoryAction =
-  | { type: 'history/undo'; meta?: ActionMeta }
-  | { type: 'history/redo'; meta?: ActionMeta }
-  | { type: 'history/breakCoalesce'; meta?: ActionMeta }
-
-export type MapAction = MapDocAction | MapHistoryAction
-
-export interface MapHistory {
-  past: StoredMap[]
-  present: StoredMap
-  future: StoredMap[]
-  coalesceKey: string | null
-}
-
 const listOf = (map: StoredMap, collection: MapCollection): Item[] =>
   (Array.isArray(map[collection]) ? map[collection] : []) as unknown as Item[]
 
@@ -88,7 +65,7 @@ const renormalize = (map: StoredMap): StoredMap =>
   }) as StoredMap
 
 /** One edit to the document, without history. */
-export function docReducer(map: StoredMap, action: MapDocAction): StoredMap {
+function docReducer(map: StoredMap, action: MapDocAction): StoredMap {
   switch (action.type) {
     case 'doc/replace':
       return action.map
@@ -132,53 +109,5 @@ export function docReducer(map: StoredMap, action: MapDocAction): StoredMap {
 
 /* ---------------- history wrapper ---------------- */
 
-export const createHistory = (map: StoredMap): MapHistory => ({
-  past: [],
-  present: map,
-  future: [],
-  coalesceKey: null,
-})
-
-/** `docReducer` with undo and redo: edits push a snapshot (or join a coalesced one), silent ones reset the stacks. */
-export function historyReducer(history: MapHistory, action: MapAction): MapHistory {
-  if (action.type === 'history/undo') {
-    if (!history.past.length) return history
-    return {
-      past: history.past.slice(0, -1),
-      present: history.past[history.past.length - 1],
-      future: [history.present, ...history.future],
-      coalesceKey: null,
-    }
-  }
-
-  if (action.type === 'history/redo') {
-    if (!history.future.length) return history
-    return {
-      past: [...history.past, history.present],
-      present: history.future[0],
-      future: history.future.slice(1),
-      coalesceKey: null,
-    }
-  }
-
-  if (action.type === 'history/breakCoalesce') {
-    return history.coalesceKey ? { ...history, coalesceKey: null } : history
-  }
-
-  const next = docReducer(history.present, action)
-  if (next === history.present) return history
-
-  const meta = action.meta || {}
-  if (meta.silent) return { past: [], present: next, future: [], coalesceKey: null }
-
-  if (meta.coalesce && meta.coalesce === history.coalesceKey && history.past.length) {
-    return { ...history, present: next, future: [] }
-  }
-
-  const past = [...history.past, history.present]
-  if (past.length > HISTORY_LIMIT) past.shift()
-  return { past, present: next, future: [], coalesceKey: meta.coalesce || null }
-}
-
-export const canUndo = (history: MapHistory): boolean => history.past.length > 0
-export const canRedo = (history: MapHistory): boolean => history.future.length > 0
+export { canRedo, canUndo, createHistory }
+export const historyReducer = withHistory(docReducer)

@@ -17,7 +17,7 @@ import { getPreference, setPreference } from './preferences'
  * Fonts bundled with the app (src/styles/fonts.js), so they render on every machine
  * whether or not the OS has them. Literata is the default writing font.
  */
-export const BUNDLED_FONTS = ['Literata', 'Inter', 'Courier Prime']
+const BUNDLED_FONTS = ['Literata', 'Inter', 'Courier Prime']
 
 /** Pinned to the top of the picker so the common choices stay one click away. */
 export const SUGGESTED_FONTS = [
@@ -96,7 +96,7 @@ const PINNED_STORAGE_KEY = 'inkblot.fonts.pinned'
 const RECENT_STORAGE_KEY = 'inkblot.fonts.recent'
 
 /** Recents past this point stop being "recent" and just crowd the menu. */
-export const MAX_RECENT_FONTS = 5
+const MAX_RECENT_FONTS = 5
 
 const readStoredFonts = (key) => {
   try {

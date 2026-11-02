@@ -20,7 +20,7 @@ fn preset(
         entry_label: entry_label.to_string(),
         folder_icon: folder_icon.to_string(),
         file_icon: file_icon.to_string(),
-        aliases: aliases.iter().map(|alias| alias.to_string()).collect(),
+        aliases: aliases.iter().map(|alias| (*alias).to_string()).collect(),
     }
 }
 

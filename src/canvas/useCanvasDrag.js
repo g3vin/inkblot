@@ -34,7 +34,7 @@ export const RESIZE_HANDLES = Object.keys(HANDLES)
 
 export const nodeTransform = (node) => `translate(${node.x}px, ${node.y}px)`
 
-export const DEFAULT_SNAP_PREFS = { guides: true, grid: true }
+const DEFAULT_SNAP_PREFS = { guides: true, grid: true }
 const EMPTY_SNAP = { dx: 0, dy: 0, guides: [] }
 
 const SNAP_PREFS_STORAGE_KEY = 'inkblot.canvas.snap'

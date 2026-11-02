@@ -310,7 +310,7 @@ the DH AH0
     #[test]
     fn known_words_rank_before_names() {
         let index = RhymeIndex::parse(SAMPLE);
-        let known: HashSet<String> = ["geiger"].iter().map(|s| s.to_string()).collect();
+        let known: HashSet<String> = ["geiger"].iter().map(|s| (*s).to_string()).collect();
         assert_eq!(
             index.rhymes_ranked("tiger", Some(&known)).unwrap(),
             vec!["geiger", "liger"]

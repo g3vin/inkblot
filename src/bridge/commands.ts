@@ -9,7 +9,7 @@
  * job and doing it twice is how the two disagree. A command that returns a boolean
  * says whether it ran: false when the editor is gone or destroyed.
  */
-import { Alignment, BlockType, HistoryAction, ListKind, MarkKind } from '../types'
+import { BlockType, HistoryAction, ListKind, MarkKind } from '../types'
 import type {
   ApplyMarkCommand,
   EditorHistoryCommand,
@@ -316,4 +316,3 @@ export function insertPlainText(editor: unknown, { text }: InsertPlainTextComman
   return true
 }
 
-export { Alignment, MarkKind }

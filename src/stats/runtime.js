@@ -29,7 +29,7 @@ import * as defaultAnnouncer from './announcer.js'
 import { observeEntries } from '../lib/entryOperations'
 
 /** How far back the streak and the heatmap look. */
-export const HISTORY_DAYS = 400
+const HISTORY_DAYS = 400
 const CELEBRATED_KEY = 'inkblot.goals.celebrated'
 const REMINDER_CHECK_MS = 30_000
 

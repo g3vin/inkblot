@@ -20,7 +20,7 @@ export function Field({ label, hint, error, htmlFor, children, className }) {
   )
 }
 
-export const Input = forwardRef(function Input({ icon, className, size = 'md', ...rest }, ref) {
+export const Input = forwardRef(({ icon, className, size = 'md', ...rest }, ref) => {
   return (
     <span className={['ib-input-wrap', `ib-input-wrap--${size}`, className].filter(Boolean).join(' ')}>
       {icon ? <Icon name={icon} className="ib-input-icon" /> : null}
@@ -29,7 +29,7 @@ export const Input = forwardRef(function Input({ icon, className, size = 'md', .
   )
 })
 
-export const TextArea = forwardRef(function TextArea({ className, ...rest }, ref) {
+export const TextArea = forwardRef(({ className, ...rest }, ref) => {
   return <textarea ref={ref} className={['ib-textarea', className].filter(Boolean).join(' ')} {...rest} />
 })
 

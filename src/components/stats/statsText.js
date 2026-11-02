@@ -9,7 +9,6 @@ import { allRoutines } from '../../stats/config.js'
 import { written } from '../../stats/goals.js'
 
 /** Opens the settings sheet, optionally on a pane: `{ pane: 'goals' }`. */
-export { OPEN_SETTINGS as OPEN_SETTINGS_EVENT } from '../../stats/timerMenu.js'
 import { OPEN_SETTINGS as OPEN_SETTINGS_EVENT } from '../../stats/timerMenu.js'
 
 export const openSettings = (pane) => window.dispatchEvent(new CustomEvent(OPEN_SETTINGS_EVENT, { detail: { pane } }))

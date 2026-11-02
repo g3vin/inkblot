@@ -20,7 +20,7 @@
  * a warning, as is binding one key to two commands.
  */
 import { useEffect, useSyncExternalStore } from 'react'
-import { getPreference, isHydrated, setPreference } from './preferences'
+import { getObjectPreference, isHydrated, setPreference } from './preferences'
 import { listAllCommands, runCommand, type Command } from './commands'
 
 export const KEYBINDINGS_KEY = 'inkblot-keybindings'
@@ -145,13 +145,8 @@ function readOverrides(): Overrides {
   if (overrides) return overrides
   // Not kept until the preferences are read, or it would stay empty.
   if (!isHydrated()) return NONE
-  try {
-    const parsed = JSON.parse(getPreference(KEYBINDINGS_KEY) || '{}')
-    overrides = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
-  } catch {
-    overrides = {}
-  }
-  return overrides as Overrides
+  overrides = getObjectPreference<Overrides>(KEYBINDINGS_KEY)
+  return overrides
 }
 
 function writeOverrides(next: Overrides) {
@@ -160,7 +155,7 @@ function writeOverrides(next: Overrides) {
   listeners.forEach((listener) => listener())
 }
 
-export function subscribeKeybindings(listener: () => void): () => void {
+function subscribeKeybindings(listener: () => void): () => void {
   listeners.add(listener)
   return () => { listeners.delete(listener) }
 }
@@ -236,7 +231,7 @@ export function pauseKeybindings(on: boolean) {
  * The command a keystroke runs, if any: the first bound to it that can run now. A
  * binding shared by two commands goes to whichever is available.
  */
-export function commandForEvent(event: KeyboardEvent, commands: Command[] = listAllCommands()): Command | null {
+function commandForEvent(event: KeyboardEvent, commands: Command[] = listAllCommands()): Command | null {
   const binding = bindingFromEvent(event)
   if (!isBindable(binding)) return null
   const from = readOverrides()

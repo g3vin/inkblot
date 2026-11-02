@@ -15,7 +15,7 @@ const NICE = [1, 2, 5]
 /** Maps with no north to point to: space has no up, and a model has its own. */
 export const NO_NORTH = new Set(['system', 'galaxy', 'universe', 'model'])
 
-export function niceScale(kmPerPx, unitKm) {
+function niceScale(kmPerPx, unitKm) {
   if (!(kmPerPx > 0)) return null
   const maxUnits = (kmPerPx * MAX_BAR_PX) / unitKm
   const exponent = Math.floor(Math.log10(maxUnits))
@@ -31,7 +31,7 @@ export function niceScale(kmPerPx, unitKm) {
 }
 
 /** Km per screen pixel at the middle of the view, or null where the map has no ground. */
-export function kmPerPixel(projector, space, viewport, width, height) {
+function kmPerPixel(projector, space, viewport, width, height) {
   const a = screenToWorld(width / 2 - 50, height / 2, viewport)
   const b = screenToWorld(width / 2 + 50, height / 2, viewport)
   const pa = projector.fromWorld([a.x, a.y])

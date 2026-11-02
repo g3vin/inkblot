@@ -26,7 +26,7 @@ const countWords = (text) => text.split(/\s+/).filter(Boolean).length
  * The runs of hidden text in `doc`, as positions: neighbouring runs join when only block
  * edges (or empty blocks) lie between them, so a hidden passage folds to one pill.
  */
-export function hiddenRuns(doc, type) {
+function hiddenRuns(doc, type) {
   const runs = []
   doc.descendants((node, pos) => {
     if (!node.isText) return true
@@ -46,7 +46,7 @@ export function hiddenRuns(doc, type) {
  * outermost, so a list item's bullet goes with its text), and inline ranges elsewhere.
  * `start` and `end` bound it all, `dead` are the positions a caret could not be seen at.
  */
-export function foldLayout(doc, run) {
+function foldLayout(doc, run) {
   const hide = []
   doc.nodesBetween(run.from, run.to, (node, pos) => {
     if (node.isText) {
@@ -151,7 +151,7 @@ const foldAt = (state, pos) => {
 }
 
 /** The folded run touching `pos`: hidden there, or ending or starting just beside it. */
-export const foldBeside = (state, pos, dir) => {
+const foldBeside = (state, pos, dir) => {
   const value = HIDDEN_TEXT_KEY.getState(state)
   if (!value) return null
   return value.runs.find((run) => {

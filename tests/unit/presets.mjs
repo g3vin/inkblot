@@ -19,11 +19,10 @@ installGlobals(dom.window, ['window', 'document', 'navigator', 'HTMLElement', 'E
   'requestAnimationFrame', 'cancelAnimationFrame', 'CustomEvent', 'Event', 'KeyboardEvent', 'MouseEvent', 'getComputedStyle'])
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
-const S = '../../src'
-const story = await import(`${S}/lib/storyStructure.js`)
-const presets = await import(`${S}/lib/folderPresets.ts`)
-const { deriveFileNodeState } = await import(`${S}/lib/fileTreeNodeState.js`)
-const FS = await import(`${S}/lib/FileSystem.js`)
+const story = await import('../../src/lib/storyStructure.js')
+const presets = await import('../../src/lib/folderPresets.ts')
+const { deriveFileNodeState } = await import('../../src/lib/fileTreeNodeState.js')
+const FS = await import('../../src/lib/FileSystem.js')
 
 /* ---------------- matching ---------------- */
 
@@ -83,7 +82,7 @@ ok('removing takes it out', !presets.allFolderPresets().some((preset) => preset.
 const React = (await import('react')).default
 const { act } = await import('react')
 const { createRoot } = await import('react-dom/client')
-const { default: FolderPresetsSheet } = await import(`${S}/components/FolderPresetsSheet.jsx`)
+const { default: FolderPresetsSheet } = await import('../../src/components/FolderPresetsSheet.jsx')
 
 const host = document.getElementById('root')
 const root = createRoot(host)

@@ -56,7 +56,7 @@ const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10)
 const lerp = (a, b, t) => a + (b - a) * t
 
 /** Perlin-style gradient noise in [-1, 1] (roughly), seeded. */
-export function noise3(x, y, z, seed = 0) {
+function noise3(x, y, z, seed = 0) {
   const xi = Math.floor(x)
   const yi = Math.floor(y)
   const zi = Math.floor(z)

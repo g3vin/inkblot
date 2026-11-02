@@ -43,7 +43,7 @@ const isMapEmpty = (map) => {
  * holds only how the project's chronology is shown — the events are the project's —
  * so deleting one never loses writing.
  */
-export const isDocumentDataEmpty = (path, data) => {
+const isDocumentDataEmpty = (path, data) => {
   if (data === null || data === undefined) return true
   if (typeof data !== 'object') return false
   switch (getDocKind(path)) {

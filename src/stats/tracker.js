@@ -32,9 +32,9 @@ export const SWITCH_HOLD = 10
 /** A session in progress is recorded this often, so a crash costs at most this. */
 export const CHECKPOINT_INTERVAL = 60
 /** The most one tick may credit. A late tick has not seen the writer in between. */
-export const MAX_TICK = 5
+const MAX_TICK = 5
 /** What the first edit after a pause is worth. */
-export const BURST_CREDIT = 1
+const BURST_CREDIT = 1
 
 const key = (project, docPath) => `${project}\u0000${docPath}`
 

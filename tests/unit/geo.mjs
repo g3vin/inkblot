@@ -7,7 +7,7 @@ import { ok } from './assert.mjs'
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps
 
 // round-trip
-let v = { x: 137, y: -42, zoom: 1.73 }
+const v = { x: 137, y: -42, zoom: 1.73 }
 const w = screenToWorld(300, 200, v)
 const s = worldToScreen(w.x, w.y, v)
 ok('screen->world->screen round-trips', near(s.x, 300) && near(s.y, 200))

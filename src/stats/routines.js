@@ -71,8 +71,8 @@ export const POMODORO = builtIn('5C0F1E6B-7A0D-4B8E-9E57-2A1C3D4E5F10', 'Pomodor
 export const LADDER = builtIn('5C0F1E6B-7A0D-4B8E-9E57-2A1C3D4E5F20', 'Ladder', [
   writeSegment(60), restSegment(10), writeSegment(30), restSegment(10), writeSegment(20),
 ])
-export const WORD_SPRINT = builtIn('5C0F1E6B-7A0D-4B8E-9E57-2A1C3D4E5F30', '500 Words', [writeSegment(null, { goal: 500 })])
-export const STOPWATCH = builtIn('5C0F1E6B-7A0D-4B8E-9E57-2A1C3D4E5F40', 'Stopwatch', [writeSegment(null)])
+const WORD_SPRINT = builtIn('5C0F1E6B-7A0D-4B8E-9E57-2A1C3D4E5F30', '500 Words', [writeSegment(null, { goal: 500 })])
+const STOPWATCH = builtIn('5C0F1E6B-7A0D-4B8E-9E57-2A1C3D4E5F40', 'Stopwatch', [writeSegment(null)])
 
 export const BUILT_IN_ROUTINES = [SPRINT, POMODORO, LADDER, WORD_SPRINT, STOPWATCH]
 

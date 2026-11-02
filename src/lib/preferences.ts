@@ -81,6 +81,17 @@ export function getPreference(key: string): string | null {
   return value === undefined ? null : value
 }
 
+/** A preference holding a JSON object, or `{}` when it is unset, malformed, or a list or scalar. */
+export function getObjectPreference<T extends object = Record<string, unknown>>(key: string): T {
+  try {
+    const stored = JSON.parse(getPreference(key) || '{}')
+    if (stored && typeof stored === 'object' && !Array.isArray(stored)) return stored
+  } catch {
+    // Malformed JSON reads as unset, like a missing key.
+  }
+  return {} as T
+}
+
 /**
  * Values are strings, because that is what the store holds and what `getPreference`
  * hands back. The `String()` guards the plain-JS call sites, which the type checker

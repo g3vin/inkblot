@@ -59,5 +59,3 @@ export const DocChapterMeta = Extension.create({
 
 /** A document's chapter head, from its doc node or its JSON: `{ subtitle, image, … }`. */
 export const readChapterMeta = (doc) => normalizeChapterMeta(doc?.attrs?.chapter)
-
-export default DocChapterMeta

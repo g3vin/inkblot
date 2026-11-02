@@ -40,7 +40,7 @@ const sameAside = (a: BubbleAside[], b: BubbleAside[]): boolean => (
 )
 
 /** Whether the arrangement is exactly this form. */
-export const isForm = (arrangement: Arrangement, form: BubbleForm): boolean => (
+const isForm = (arrangement: Arrangement, form: BubbleForm): boolean => (
   (form.mode ?? BubbleMode.Words) === arrangement.mode
   && sameWords(form.words, arrangement.words)
   && sameAside(form.aside ?? [], arrangement.aside)

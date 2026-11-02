@@ -19,7 +19,7 @@ import { PROSE_CSS } from './html'
 import type { PMJSON } from './portable'
 
 /** A scene break every reader's font can set. */
-export const PLAIN_SCENE_BREAK = '* * *'
+const PLAIN_SCENE_BREAK = '* * *'
 
 const PT_PER_MM = 72 / 25.4
 
@@ -139,8 +139,8 @@ export interface EbookImage {
 }
 
 /** The stores' limits: Kindle's 5 MB per image, and 4 million pixels. */
-export const EBOOK_IMAGE_MAX_BYTES = 5 * 1024 * 1024
-export const EBOOK_IMAGE_MAX_PIXELS = 4_000_000
+const EBOOK_IMAGE_MAX_BYTES = 5 * 1024 * 1024
+const EBOOK_IMAGE_MAX_PIXELS = 4_000_000
 
 /** Images a chapter shows, with their alt text: body images and the head's. */
 export const ebookImagesOf = (doc: PMJSON): EbookImage[] => {

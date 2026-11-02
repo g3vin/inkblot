@@ -33,16 +33,15 @@ import { ok } from './assert.mjs'
 const dom = new JSDOM('<!doctype html><html><body></body></html>', { pretendToBeVisual: true })
 installGlobals(dom.window, ['window', 'document', 'requestAnimationFrame', 'cancelAnimationFrame'])
 
-const C = '../../src'
-const { createInProcessTransports, createDeferredTransports } = await import(`${C}/bridge/transport.ts`)
-const { createShellBridge, createSurfaceBridge, BridgeRequestError } = await import(`${C}/bridge/client.ts`)
-const { createEditorRegistry } = await import(`${C}/bridge/editorRegistry.ts`)
-const { createDocumentSurface } = await import(`${C}/bridge/surface.ts`)
-const { createCoalescer, immediateScheduler } = await import(`${C}/bridge/coalesce.ts`)
-const { createDragHandoff } = await import(`${C}/bridge/dragHandoff.ts`)
-const { resolveAnchor, readAnchor, findText } = await import(`${C}/bridge/anchors.ts`)
-const { EditorTarget, MarkKind, Alignment } = await import(`${C}/types/index.ts`)
-const { DragPayloadKind } = await import(`${C}/bridge/dragHandoff.ts`)
+const { createInProcessTransports, createDeferredTransports } = await import('../../src/bridge/transport.ts')
+const { createShellBridge, createSurfaceBridge, BridgeRequestError } = await import('../../src/bridge/client.ts')
+const { createEditorRegistry } = await import('../../src/bridge/editorRegistry.ts')
+const { createDocumentSurface } = await import('../../src/bridge/surface.ts')
+const { createCoalescer, immediateScheduler } = await import('../../src/bridge/coalesce.ts')
+const { createDragHandoff } = await import('../../src/bridge/dragHandoff.ts')
+const { resolveAnchor, readAnchor, findText } = await import('../../src/bridge/anchors.ts')
+const { EditorTarget, MarkKind, Alignment } = await import('../../src/types/index.ts')
+const { DragPayloadKind } = await import('../../src/bridge/dragHandoff.ts')
 
 /* ------------------------------------------------------------------
    A fake editor.
@@ -517,8 +516,8 @@ function wire({ deferred = false } = {}) {
   const { act } = await import('react')
   const React = (await import('react')).default
   const { createRoot } = await import('react-dom/client')
-  const Toolbar = (await import(`${C}/components/toolbar/ToolbarHost.jsx`)).default
-  const { documentSurface, editorRegistry } = await import(`${C}/bridge/index.ts`)
+  const Toolbar = (await import('../../src/components/toolbar/ToolbarHost.jsx')).default
+  const { documentSurface, editorRegistry } = await import('../../src/bridge/index.ts')
 
   const editor = makeEditor()
   editorRegistry.register(EditorTarget.Primary, { getEditor: () => editor })

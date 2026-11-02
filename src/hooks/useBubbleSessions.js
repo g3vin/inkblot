@@ -47,7 +47,7 @@ export const selectionForBubble = (editor) => {
  * Walks the block's own children, so an image or a line break in the paragraph does not
  * throw the positions off.
  */
-export const findTextInDocument = (doc, text) => {
+const findTextInDocument = (doc, text) => {
   if (!text) return null
   let found = null
   doc.descendants((node, pos) => {

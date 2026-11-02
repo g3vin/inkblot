@@ -20,7 +20,7 @@ export const METRIC_INFO = {
 }
 
 /** "1,000 words", "45 min". */
-export const describeMetric = (metric, amount) => `${formatNumber(amount)} ${METRIC_INFO[metric]?.unit ?? ''}`.trim()
+const describeMetric = (metric, amount) => `${formatNumber(amount)} ${METRIC_INFO[metric]?.unit ?? ''}`.trim()
 
 export const emptyDayGoal = () => ({ targets: [], requireAll: true, rest: false })
 
@@ -36,7 +36,7 @@ export function goalSummary(goal) {
 export const emptyGoalPlan = () => ({ weekly: Array.from({ length: 7 }, emptyDayGoal), overrides: [], project: null })
 
 /** Nothing asked of any day: then a streak is simply days written. */
-export function planIsEmpty(plan) {
+function planIsEmpty(plan) {
   return plan.weekly.every((goal) => goal.targets.length === 0) && plan.overrides.every((o) => o.goal.targets.length === 0)
 }
 
@@ -73,7 +73,7 @@ export function addProgress(a, b) {
   }
 }
 
-export function metricValue(progress, metric) {
+function metricValue(progress, metric) {
   switch (metric) {
     case 'words': return progress.words
     case 'netWords': return progress.netWords
@@ -312,7 +312,7 @@ function reminderBody(reminder, day, isToday, goals, today) {
    ============================================================ */
 
 /** A minute counts toward flow when at least this much of it was typing. */
-export const FLOW_MINUTE_ACTIVE_SECS = 20
+const FLOW_MINUTE_ACTIVE_SECS = 20
 
 /** The longest run of consecutive minutes spent mostly typing. */
 export function longestRun(minutes) {

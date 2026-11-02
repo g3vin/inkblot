@@ -140,7 +140,7 @@ export function createMessageDragController({ commitAttributes, getAttrs, messag
 
     if (element.closest?.('.conversation-column-adders')) {
       setMessageDropIndex(getAttrs().messages.length)
-      return
+      
     }
   }
 

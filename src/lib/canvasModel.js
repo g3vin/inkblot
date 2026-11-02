@@ -22,16 +22,16 @@
 import { nodesBounds, padRect, rectContains } from './canvasGeometry'
 import { CANVAS_PRESET_INKS, inkColor, inkVar } from './palette'
 
-export const CANVAS_FORMAT_VERSION = 1
+const CANVAS_FORMAT_VERSION = 1
 
 /** Node types we understand. 'draw' is reserved: normalizeCanvas round-trips it
  *  untouched so a future freehand layer needs no format migration. */
-export const NODE_TYPES = ['text', 'file', 'link', 'group', 'draw']
+const NODE_TYPES = ['text', 'file', 'link', 'group', 'draw']
 
 /** JSON Canvas presets are the strings '1'–'6', drawn in the ink palette
  *  (src/lib/palette.ts). A node may also carry any hex color: one from an earlier
  *  Inkblot palette draws as its ink, anything else passes through untouched. */
-export const CANVAS_COLOR_PRESETS = [
+const CANVAS_COLOR_PRESETS = [
   { id: '1', label: 'Red', value: inkVar(CANVAS_PRESET_INKS[1]) },
   { id: '2', label: 'Rust', value: inkVar(CANVAS_PRESET_INKS[2]) },
   { id: '3', label: 'Amber', value: inkVar(CANVAS_PRESET_INKS[3]) },
@@ -68,7 +68,7 @@ export const DEFAULT_GROUP_PADDING = 24
 export const MIN_NODE_SIZE = { width: 100, height: 60 }
 
 /** 16 hex chars, matching the id style Obsidian writes. */
-export const newId = () => {
+const newId = () => {
   const bytes = new Uint8Array(8)
   crypto.getRandomValues(bytes)
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
@@ -120,7 +120,7 @@ export const makeNoteNode = ({ x = 0, y = 0, file = '', noteId = '', ...rest } =
 export const DEFAULT_TIMELINE_EVENT_NODE_SIZE = { width: 260, height: 120 }
 
 /** Where the chronology lives: what a timeline event card's `file` names. */
-export const TIMELINE_FILE = '.story/timeline.json'
+const TIMELINE_FILE = '.story/timeline.json'
 
 /**
  * A timeline event, placed on the canvas. Like a note card it is a reference, not a

@@ -9,15 +9,15 @@
  * the two never drift apart. The pop's keyframes are in Notes.css.
  */
 
-export const STRING_PX_PER_MS = 2.9
+const STRING_PX_PER_MS = 2.9
 export const STRING_MIN_MS = 36
-export const STRING_MAX_MS = 150
-export const STRING_ARRIVES_AT = 1
+const STRING_MAX_MS = 150
+const STRING_ARRIVES_AT = 1
 export const NOTE_POP_MS = 240
 /** The pop eases out: the note looks in place well before it ends, the rest a last
  *  creep too small to see. Its children's lines start then, not after the creep,
  *  which read as a pause between one generation and the next. */
-export const CHILDREN_START_AT = 0.45
+const CHILDREN_START_AT = 0.45
 /** Closing, the opening backwards and quicker: a note shrinks in NOTE_CLOSE_MS, then
  *  its line draws back into its parent, never quicker than STRING_CLOSE_MIN_MS so
  *  even a short one is seen to go; a parent shrinks once all its lines are in. */

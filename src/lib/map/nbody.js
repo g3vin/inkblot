@@ -68,7 +68,7 @@ export function stateFromOrbits(system) {
 }
 
 /** The bodies an integration runs on, with their masses and day-0 states. */
-export function initialBodies(system) {
+function initialBodies(system) {
   const bodies = new Map((system?.bodies || []).map((body) => [body.id, body]))
   const fromOrbits = stateFromOrbits(system)
   const list = []
@@ -166,7 +166,7 @@ function yoshida(state, dt, eps2, acc) {
 }
 
 /** Advance `state` by `dt` days (negative runs it backwards). */
-export function step(state, dt, eps2, acc = new Float64Array(state.n * 3)) {
+function step(state, dt, eps2, acc = new Float64Array(state.n * 3)) {
   const pieces = substepsFor(state, dt, eps2)
   const h = dt / pieces
   for (let piece = 0; piece < pieces; piece += 1) yoshida(state, h, eps2, acc)
@@ -223,7 +223,7 @@ export function createRun(system) {
   const stateAt = (day) => {
     const d = Number.isFinite(day) ? day : 0
     const k = Math.trunc(d / span)
-    let state = copy(checkpoint(k))
+    const state = copy(checkpoint(k))
     let remaining = d - k * span
     const sign = remaining < 0 ? -1 : 1
     while (Math.abs(remaining) >= dt) {
@@ -286,7 +286,7 @@ export function runFor(system) {
 }
 
 /** Positions on `day` for an N-body system; belts and barycentres sit at the centre of mass. */
-export function nbodyPositionsAt(system, day) {
+function nbodyPositionsAt(system, day) {
   const run = runFor(system)
   const positions = run.positionsAt(day)
   const bodies = new Map((system.bodies || []).map((body) => [body.id, body]))
@@ -407,7 +407,7 @@ export function toNbody(system) {
 
 const KM_PER_AU_HERE = 149597870.7
 /** Passes closer than this (AU) are worth telling the writer about. */
-export const CLOSE_PASS_AU = 0.05
+const CLOSE_PASS_AU = 0.05
 
 /**
  * Every close pass over the story: `[{ ids: [a, b], day, au, touching }]`, one per

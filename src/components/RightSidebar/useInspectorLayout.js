@@ -23,11 +23,11 @@ import {
   visibleTabs,
 } from '../../lib/chromeLayout'
 
-export const INSPECTOR_LAYOUTS_CHANGED = 'inkblot:inspector-layouts-changed'
+const INSPECTOR_LAYOUTS_CHANGED = 'inkblot:inspector-layouts-changed'
 
 export const readInspectorLayouts = () => normalizeInspectorLayouts(getPreference(INSPECTOR_LAYOUTS_KEY))
 
-export function writeInspectorLayouts(layouts) {
+function writeInspectorLayouts(layouts) {
   setPreference(INSPECTOR_LAYOUTS_KEY, serializeInspectorLayouts(layouts))
   window.dispatchEvent(new CustomEvent(INSPECTOR_LAYOUTS_CHANGED))
 }

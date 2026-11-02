@@ -35,7 +35,7 @@ const NOT_INHERITED: Record<string, string[]> = {
 }
 
 let counter = 0
-export const newTypesetId = (): string => {
+const newTypesetId = (): string => {
   counter = (counter + 1) % 46656
   return `t${Date.now().toString(36)}${counter.toString(36)}`
 }
@@ -65,7 +65,7 @@ export const anchorBlock = (tr: Transaction, pos: number): string | null => {
   return id
 }
 
-export const typesetAnchorsKey = new PluginKey('typesetAnchors')
+const typesetAnchorsKey = new PluginKey('typesetAnchors')
 
 export const TypesetAnchors = Extension.create({
   name: 'typesetAnchors',

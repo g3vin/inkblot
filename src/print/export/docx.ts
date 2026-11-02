@@ -557,7 +557,7 @@ const SCRIPT_STYLES: ScriptStyle[] = [
 ]
 
 /** The style id a script element's paragraphs take ("ScriptDialogue"). */
-export const scriptStyleId = (element: unknown): string => {
+const scriptStyleId = (element: unknown): string => {
   const spec = SCRIPT_STYLES.find((s) => s.id === element) || SCRIPT_STYLES[1]
   return `Script${spec.id[0].toUpperCase()}${spec.id.slice(1)}`
 }
@@ -576,7 +576,7 @@ const scriptStylesXml = (stage: boolean): string => SCRIPT_STYLES.map((s) => {
 }).join('\n')
 
 /** A named text style's Word style id. */
-export const textStyleId = (id: string): string => `Text${id.replace(/[^A-Za-z0-9]/g, '')}`
+const textStyleId = (id: string): string => `Text${id.replace(/[^A-Za-z0-9]/g, '')}`
 
 /** The book's named text styles, as Word paragraph styles over Normal. */
 const textStylesXml = (looks: TextStyleLook[], t: PrintTypography | undefined): string => {

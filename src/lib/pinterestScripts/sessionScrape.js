@@ -115,7 +115,7 @@
         (((pin || {}).images || {})['564x'] || {}).url ||
         (((pin || {}).images || {})['474x'] || {}).url ||
         (((pin || {}).images || {})['236x'] || {}).url ||
-        (((pin || {}).images || {})['orig'] || {}).url ||
+        (((pin || {}).images || {}).orig || {}).url ||
         String(pin && pin.image_large_url ? pin.image_large_url : '');
       if (!imageUrl || imageUrl.indexOf('i.pinimg.com') === -1) continue;
       const pinHref = 'https://www.pinterest.com/pin/' + pinId + '/';

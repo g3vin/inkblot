@@ -34,3 +34,6 @@ inkblot-dictation = { git = "https://github.com/g3vin/inkblot-dictation.git", br
 
 [dev-dependencies]
 tokio = { version = "1", features = ["time", "sync", "rt", "macros"] }
+
+[lints]
+workspace = true

@@ -35,7 +35,7 @@ export const normalizeSelectionWheel = (value) => {
 let current = null
 const listeners = new Set()
 
-export const loadSelectionWheel = () => {
+const loadSelectionWheel = () => {
   if (current) return current
   try {
     current = normalizeSelectionWheel(JSON.parse(getPreference(SELECTION_WHEEL_KEY) || '{}'))

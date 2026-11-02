@@ -3,8 +3,7 @@
  * book reads as the first time it is typeset. Pure functions over book settings; the
  * pages they lay out are the `print` and layout suites'.
  */
-const C = '../../src'
-const design = await import(`${C}/print/chapterDesign.ts`)
+const design = await import('../../src/print/chapterDesign.ts')
 
 const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) process.exitCode = 1 }
 
@@ -63,8 +62,8 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   if (!globalThis.window) Object.defineProperty(globalThis, 'window', { value: dom.window, writable: true, configurable: true })
   const { Editor } = await import('@tiptap/core')
   const { StarterKit } = await import('@tiptap/starter-kit')
-  const lock = await import(`${C}/print/TypesetLock.ts`)
-  const { DocPageSetup } = await import(`${C}/print/DocPageSetup.js`)
+  const lock = await import('../../src/print/TypesetLock.ts')
+  const { DocPageSetup } = await import('../../src/print/DocPageSetup.js')
 
   const editor = new Editor({
     extensions: [StarterKit, DocPageSetup, lock.TypesetLock],
@@ -100,9 +99,9 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- a book's contents: its own order, reconciled with the folder ---- */
 
 {
-  const items = await import(`${C}/print/bookItems.ts`)
-  const { bookRows } = await import(`${C}/print/bookRows.ts`)
-  const matter = await import(`${C}/print/bookMatter.ts`)
+  const items = await import('../../src/print/bookItems.ts')
+  const { bookRows } = await import('../../src/print/bookRows.ts')
+  const matter = await import('../../src/print/bookMatter.ts')
   const tree = ['Novel/One', 'Novel/Two', 'Novel/Act II/Three', 'Novel/Act II/Four', 'Novel/Five']
 
   const fresh = items.reconcileBookItems({
@@ -195,10 +194,10 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- changing a book's contents, on disk ---- */
 
 {
-  const { saveDocument, loadDocument } = await import(`${C}/lib/FileSystem.js`)
-  const contents = await import(`${C}/print/bookContents.js`)
-  const store = await import(`${C}/print/printLayoutStore.js`)
-  const { relocateBooks, booksSettled } = await import(`${C}/print/bookStore.js`)
+  const { saveDocument, loadDocument } = await import('../../src/lib/FileSystem.js')
+  const contents = await import('../../src/print/bookContents.js')
+  const store = await import('../../src/print/printLayoutStore.js')
+  const { relocateBooks, booksSettled } = await import('../../src/print/bookStore.js')
   const { setInvokeHandler } = await import('./stub-core.mjs')
   setInvokeHandler(async () => null)
   const P = 'Typeset'
@@ -267,7 +266,7 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
   ok('renaming the folder takes the book, its chapters’ and its pages’ paths with it',
     relocated.some((it) => it.path === 'Book/One') && relocated.find((it) => it.matter === 'dedication').path.startsWith('Book/.book/'))
 
-  const { bookFolderFor } = await import(`${C}/print/compile.ts`)
+  const { bookFolderFor } = await import('../../src/print/compile.ts')
   ok('a page of the book’s own belongs to the book’s folder',
     bookFolderFor('Book/.book/dedication-x', 'folder') === 'Book' && bookFolderFor('.book/copyright-y', 'folder') === '' && bookFolderFor('Book/One', 'folder') === 'Book')
 }
@@ -275,16 +274,16 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- chapter heads, as the book designs them ---- */
 
 {
-  const matter = await import(`${C}/print/bookMatter.ts`)
-  const { DEFAULT_CHAPTER_DESIGN } = await import(`${C}/print/chapterDesign.ts`)
-  const { chapterHeadSpec, chapterHeadText } = await import(`${C}/print/ChapterHead.js`)
-  const portable = await import(`${C}/print/export/portable.ts`)
-  const { runOn } = await import(`${C}/print/printJob.js`)
-  const { BOOK_STYLES, applyBookStyle, bookStyle } = await import(`${C}/print/bookStyles.ts`)
-  const { normalizeChapterMeta } = await import(`${C}/print/DocChapterMeta.js`)
+  const matter = await import('../../src/print/bookMatter.ts')
+  const { DEFAULT_CHAPTER_DESIGN } = await import('../../src/print/chapterDesign.ts')
+  const { chapterHeadSpec, chapterHeadText } = await import('../../src/print/ChapterHead.js')
+  const portable = await import('../../src/print/export/portable.ts')
+  const { runOn } = await import('../../src/print/printJob.js')
+  const { BOOK_STYLES, applyBookStyle, bookStyle } = await import('../../src/print/bookStyles.ts')
+  const { normalizeChapterMeta } = await import('../../src/print/DocChapterMeta.js')
   const { generateHTML, Editor } = await import('@tiptap/core')
-  const { getDocPreviewExtensions } = await import(`${C}/lib/editorExtensions.js`)
-  const { normalizePageSetup } = await import(`${C}/print/pageSetup.ts`)
+  const { getDocPreviewExtensions } = await import('../../src/lib/editorExtensions.js')
+  const { normalizePageSetup } = await import('../../src/print/pageSetup.ts')
 
   const h1 = (text) => ({ type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text }] })
   const p = (text) => ({ type: 'paragraph', content: [{ type: 'text', text }] })
@@ -371,9 +370,9 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 {
   const { Editor } = await import('@tiptap/core')
   const { StarterKit } = await import('@tiptap/starter-kit')
-  const { TypesetLock } = await import(`${C}/print/TypesetLock.ts`)
-  const { DocPageSetup } = await import(`${C}/print/DocPageSetup.js`)
-  const { DocChapterMeta, readChapterMeta } = await import(`${C}/print/DocChapterMeta.js`)
+  const { TypesetLock } = await import('../../src/print/TypesetLock.ts')
+  const { DocPageSetup } = await import('../../src/print/DocPageSetup.js')
+  const { DocChapterMeta, readChapterMeta } = await import('../../src/print/DocChapterMeta.js')
   const editor = new Editor({ extensions: [StarterKit, DocPageSetup, DocChapterMeta, TypesetLock], content: '<h1>A</h1><p>b</p>' })
   editor.storage.typesetLock.locked = true
   editor.commands.setChapterMeta({ subtitle: 'Sub' })
@@ -387,10 +386,10 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 
 {
   const { Editor } = await import('@tiptap/core')
-  const { getDocPreviewExtensions } = await import(`${C}/lib/editorExtensions.js`)
-  const history = await import(`${C}/print/typesetHistory.ts`)
-  const { anchorBlock } = await import(`${C}/print/TypesetAnchors.ts`)
-  const docSetup = await import(`${C}/print/DocPageSetup.js`)
+  const { getDocPreviewExtensions } = await import('../../src/lib/editorExtensions.js')
+  const history = await import('../../src/print/typesetHistory.ts')
+  const { anchorBlock } = await import('../../src/print/TypesetAnchors.ts')
+  const docSetup = await import('../../src/print/DocPageSetup.js')
 
   const editor = new Editor({ extensions: getDocPreviewExtensions(), content: '<p>One two three.</p><p>Four.</p>' })
   const tighten = (pos, value) => {
@@ -465,7 +464,7 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- the typeset history, on disk ---- */
 
 {
-  const store = await import(`${C}/print/typesetHistoryStore.js`)
+  const store = await import('../../src/print/typesetHistoryStore.js')
   const { files } = await import('./stub-fs.mjs')
   const P = 'History'
   const entry = (id, kind = 'auto') => ({ id, kind, timestamp: '2026-09-26T12:00:00Z', summary: ['x'], snapshot: { book: {}, chapters: { 'Novel/One': { pageSetup: null, chapter: null, blocks: {} } } } })
@@ -486,10 +485,10 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- covers: the wrap, its checks, its versions ---- */
 
 {
-  const wrap = await import(`${C}/print/coverWrap.ts`)
-  const design = await import(`${C}/print/chapterDesign.ts`)
-  const { spineWidthMm } = await import(`${C}/print/preflight.ts`)
-  const { mmToPx } = await import(`${C}/print/pageSizes.ts`)
+  const wrap = await import('../../src/print/coverWrap.ts')
+  const design = await import('../../src/print/chapterDesign.ts')
+  const { spineWidthMm } = await import('../../src/print/preflight.ts')
+  const { mmToPx } = await import('../../src/print/pageSizes.ts')
 
   const spine = spineWidthMm({ pageCount: 220, paper: 'cream', service: 'kdp' })
   const g = wrap.wrapGeometry(152.4, 228.6, spine)
@@ -533,10 +532,10 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- the e-book: its stylesheet, what it leaves out, its checks, the reader ---- */
 
 {
-  const ebook = await import(`${C}/print/export/ebook.ts`)
-  const design = await import(`${C}/print/chapterDesign.ts`)
-  const devices = await import(`${C}/print/devicePresets.ts`)
-  const { normalizeTypography } = await import(`${C}/print/typography.ts`)
+  const ebook = await import('../../src/print/export/ebook.ts')
+  const design = await import('../../src/print/chapterDesign.ts')
+  const devices = await import('../../src/print/devicePresets.ts')
+  const { normalizeTypography } = await import('../../src/print/typography.ts')
 
   ok('a book with no e-book options has the defaults', JSON.stringify(design.digitalOf({})) === JSON.stringify(design.DEFAULT_DIGITAL))
   ok('…and one with some keeps them, and only booleans',
@@ -594,7 +593,7 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- the typesetter's fixes, as pagination honours them ---- */
 
 {
-  const { paginate } = await import(`${C}/print/paginate.ts`)
+  const { paginate } = await import('../../src/print/paginate.ts')
   const near = (a, b) => Math.abs(a - b) < 0.01
   const frame = { slotHeight: 100, stride: 150, columns: 1, minLines: 2 }
   const para = (pos, top, n, extra = {}) => ({
@@ -625,7 +624,7 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- composition: how lines are set ---- */
 
 {
-  const ty = await import(`${C}/print/typography.ts`)
+  const ty = await import('../../src/print/typography.ts')
   const base = ty.normalizeTypography({ fontFamily: 'Palatino', fontSizePt: 11, lineSpacing: 'exact', lineValue: 14, paragraphSpacingPt: 10 })
   ok('a typography without a composition composes as the defaults: balanced, punctuation hung',
     ty.typographyClasses(base).includes('pt-balance') && ty.typographyClasses(base).includes('pt-hang') && !ty.typographyClasses(base).includes('pt-grid'))
@@ -646,7 +645,7 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- the proof: what a proofreader marks ---- */
 
 {
-  const { analyzeLines } = await import(`${C}/print/proofIssues.ts`)
+  const { analyzeLines } = await import('../../src/print/proofIssues.ts')
   let at = 0
   const word = (text, left, width, broken = false) => {
     const w = { text, from: at, to: at + text.length, left, right: left + width, broken }
@@ -680,7 +679,7 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- a font file: its family, and whether it may be embedded ---- */
 
 {
-  const { readFontInfo, familyFromFileName, styleFromName } = await import(`${C}/print/fontFile.ts`)
+  const { readFontInfo, familyFromFileName, styleFromName } = await import('../../src/print/fontFile.ts')
   // An sfnt with a `name` table (family 1, style 2, typographic family 16) and an OS/2.
   const build = ({ fsType, weight = 400, family = 'Test Serif', sub = 'Bold Italic' }) => {
     const strings = [[1, 'Test Serif Bold'], [2, sub], [16, family]]
@@ -721,12 +720,12 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- named text styles ---- */
 
 {
-  const ts = await import(`${C}/print/textStyles.ts`)
+  const ts = await import('../../src/print/textStyles.ts')
   const { Editor } = await import('@tiptap/core')
   const { StarterKit } = await import('@tiptap/starter-kit')
-  const { ParagraphTypeset, setParagraphTypeset } = await import(`${C}/print/ParagraphTypeset.ts`)
-  const { TypesetAnchors } = await import(`${C}/print/TypesetAnchors.ts`)
-  const { TYPESET_META } = await import(`${C}/print/TypesetLock.ts`)
+  const { ParagraphTypeset, setParagraphTypeset } = await import('../../src/print/ParagraphTypeset.ts')
+  const { TypesetAnchors } = await import('../../src/print/TypesetAnchors.ts')
+  const { TYPESET_META } = await import('../../src/print/TypesetLock.ts')
 
   const plain = ts.textStylesOf({})
   ok('a book has the app’s styles, in the menu’s order', plain[0].id === 'letter' && plain.some((s) => s.id === 'textMessage') && plain.length === ts.BUILTIN_TEXT_STYLES.length)
@@ -763,8 +762,8 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- footnotes and endnotes ---- */
 
 {
-  const notes = await import(`${C}/print/notes.ts`)
-  const { paginate } = await import(`${C}/print/paginate.ts`)
+  const notes = await import('../../src/print/notes.ts')
+  const { paginate } = await import('../../src/print/paginate.ts')
   const fn = (id, text) => ({ type: 'footnote', attrs: { id, text } })
   const para = (...inline) => ({ type: 'paragraph', content: inline })
   const t = (text) => ({ type: 'text', text })
@@ -821,11 +820,11 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 {
   const { Editor, generateHTML } = await import('@tiptap/core')
   const { StarterKit } = await import('@tiptap/starter-kit')
-  const { Footnote } = await import(`${C}/print/Footnote.ts`)
-  const { toMarkdown } = await import(`${C}/print/export/markdown.ts`)
-  const { buildPlainText } = await import(`${C}/print/export/text.ts`)
-  const { withLinkedNotes } = await import(`${C}/print/export/html.ts`)
-  const { inTextNotes } = await import(`${C}/print/export/portable.ts`)
+  const { Footnote } = await import('../../src/print/Footnote.ts')
+  const { toMarkdown } = await import('../../src/print/export/markdown.ts')
+  const { buildPlainText } = await import('../../src/print/export/text.ts')
+  const { withLinkedNotes } = await import('../../src/print/export/html.ts')
+  const { inTextNotes } = await import('../../src/print/export/portable.ts')
 
   const editor = new Editor({ extensions: [StarterKit, Footnote], content: '<p>It rained.</p>' })
   editor.chain().setTextSelection(11).insertFootnote('Or so they said > then.').run()
@@ -850,8 +849,8 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- pictures with a page to themselves, and to its edges ---- */
 
 {
-  const { paginate } = await import(`${C}/print/paginate.ts`)
-  const { withBleed } = await import(`${C}/print/bleed.ts`)
+  const { paginate } = await import('../../src/print/paginate.ts')
+  const { withBleed } = await import('../../src/print/bleed.ts')
   const frame = { slotHeight: 100, stride: 150, columns: 1, minLines: 2 }
   const para = (pos, top, n) => ({ kind: 'text', pos, top, bottom: top + n * 10, lines: Array.from({ length: n }, (_, i) => ({ top: top + i * 10, bottom: top + (i + 1) * 10, pos: pos + 1 + i * 10 })) })
   const soft = (pos, at) => ({ kind: 'break', pos, top: at, bottom: at, breakKind: 'soft' })
@@ -880,10 +879,10 @@ const ok = (l, c) => { console.log(`${c ? 'PASS' : 'FAIL'}  ${l}`); if (!c) proc
 /* ---- editions: one book in several forms ---- */
 
 {
-  const ed = await import(`${C}/print/editions.ts`)
-  const store = await import(`${C}/print/printLayoutStore.js`)
-  const { booksSettled } = await import(`${C}/print/bookStore.js`)
-  const { normalizePageSetup } = await import(`${C}/print/pageSetup.ts`)
+  const ed = await import('../../src/print/editions.ts')
+  const store = await import('../../src/print/printLayoutStore.js')
+  const { booksSettled } = await import('../../src/print/bookStore.js')
+  const { normalizePageSetup } = await import('../../src/print/pageSetup.ts')
   const base = normalizePageSetup({ presetId: 'trade-6x9', widthMm: 152.4, heightMm: 228.6, typography: { fontFamily: 'Palatino', fontSizePt: 11, alignment: 'justify', hyphenate: true, lineSpacing: 'multiple', lineValue: 1.2 } })
   let book = { title: 'The Book', pageSetup: base, covers: [{ id: 'v1', name: 'Paper' }, { id: 'v2', name: 'Cloth' }], activeCover: 'v1' }
 

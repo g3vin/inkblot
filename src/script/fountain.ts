@@ -45,7 +45,7 @@ const HAS_LETTER = /\p{L}/u
 const isUpperLine = (line: string): boolean => HAS_LETTER.test(line) && line === line.toUpperCase()
 
 /** Text with Fountain's emphasis turned into marked text nodes. */
-export const parseInline = (source: string): PMJSON[] => {
+const parseInline = (source: string): PMJSON[] => {
   const out: PMJSON[] = []
   const marks: string[] = []
   let text = ''
@@ -229,7 +229,7 @@ export const parseFountain = (source: string): FountainDocument => {
 const escapeText = (text: string): string => text.replace(/([\\*_])/g, '\\$1')
 
 /** Marked text as Fountain emphasis. */
-export const serializeInline = (nodes: PMJSON[] = []): string => {
+const serializeInline = (nodes: PMJSON[] = []): string => {
   let out = ''
   for (const node of nodes) {
     if (node.type === 'hardBreak') {

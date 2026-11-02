@@ -430,7 +430,7 @@ const GROUP_GAP_MS = 15 * 60 * 1000
 
 const dayKeyOf = (date) => `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
 
-export function formatDayLabel(iso) {
+function formatDayLabel(iso) {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return String(iso || '')
 

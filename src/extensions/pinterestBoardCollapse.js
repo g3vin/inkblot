@@ -76,7 +76,7 @@ export function createPinterestBoardCollapse({ container, expandHint, masonry })
       e?.stopPropagation?.()
       expanded = true
       updateCollapseState()
-      return
+      
     }
 
     // When already expanded, don't hijack normal interactions.

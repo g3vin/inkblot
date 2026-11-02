@@ -1,0 +1,9 @@
+{
+  "path": ["src", "scripts"],
+  "ignore": ["**/inkblot-core.ts", "**/g2p/data/**", "**/*.css", "**/*.json"],
+  "minTokens": 70,
+  "minLines": 8,
+  "threshold": 0.25,
+  "reporters": ["consoleFull"],
+  "gitignore": true
+}

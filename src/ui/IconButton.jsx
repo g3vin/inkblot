@@ -9,10 +9,10 @@ import { forwardRef } from 'react'
 import Icon from './Icon.jsx'
 import Button from './Button.jsx'
 
-const IconButton = forwardRef(function IconButton(
+const IconButton = forwardRef((
   { icon, label, display = 'icon', size = 'toolbar', iconSize = 16, filled = false, className = '', title, children, ...rest },
   ref,
-) {
+) => {
   return (
     <Button
       ref={ref}

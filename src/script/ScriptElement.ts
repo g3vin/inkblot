@@ -286,5 +286,3 @@ export const ScriptElement = Node.create({
     ]
   },
 })
-
-export default ScriptElement

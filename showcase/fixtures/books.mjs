@@ -33,7 +33,7 @@ import { applyFormat } from '../../src/print/formats.ts'
 const texts = JSON.parse(fs.readFileSync(new URL('./books/texts.json', import.meta.url), 'utf8'))
 const asset = (name) => fs.readFileSync(new URL(`./assets/${name}`, import.meta.url))
 
-export const LITTLE_WOMEN = 'Little Women'
+const LITTLE_WOMEN = 'Little Women'
 export const EARNEST = 'The Importance of Being Earnest'
 export const LIGHTHOUSE = 'To the Lighthouse'
 /** The project the shots open unless they say otherwise. */

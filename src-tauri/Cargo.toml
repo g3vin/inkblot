@@ -30,6 +30,17 @@ font-kit = "0.14"
 typeshare = "1.0"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "cookies", "gzip", "brotli", "deflate"] }
 
+# Beyond clippy's defaults: simpler spellings of the same code, each machine-fixable
+# (`cargo clippy --fix`). Every package opts in with `[lints] workspace = true`.
+[workspace.lints.clippy]
+inefficient_to_string = "warn"
+manual_string_new = "warn"
+or_fun_call = "warn"
+redundant_clone = "warn"
+redundant_closure_for_method_calls = "warn"
+semicolon_if_nothing_returned = "warn"
+uninlined_format_args = "warn"
+
 [package]
 name = "inkblot"
 description = "Inkblot, the Tauri app"
@@ -40,6 +51,9 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
+
+[lints]
+workspace = true
 
 [lib]
 name = "inkblot_lib"

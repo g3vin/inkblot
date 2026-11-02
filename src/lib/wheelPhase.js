@@ -14,23 +14,23 @@
  */
 import { listen } from '@tauri-apps/api/event'
 
-export const WHEEL_PHASE_BEGAN = 1
-export const WHEEL_PHASE_STATIONARY = 2
-export const WHEEL_PHASE_CHANGED = 4
-export const WHEEL_PHASE_ENDED = 8
-export const WHEEL_PHASE_CANCELLED = 16
-export const WHEEL_PHASE_MAY_BEGIN = 32
+const WHEEL_PHASE_BEGAN = 1
+const WHEEL_PHASE_STATIONARY = 2
+const WHEEL_PHASE_CHANGED = 4
+const WHEEL_PHASE_ENDED = 8
+const WHEEL_PHASE_CANCELLED = 16
+const WHEEL_PHASE_MAY_BEGIN = 32
 
-export const hasWheelPhase = (phase, flag) => Number.isFinite(phase) && (phase & flag) === flag
+const hasWheelPhase = (phase, flag) => Number.isFinite(phase) && (phase & flag) === flag
 
-export const hasActiveWheelPhase = (phase) => (
+const hasActiveWheelPhase = (phase) => (
   hasWheelPhase(phase, WHEEL_PHASE_BEGAN)
   || hasWheelPhase(phase, WHEEL_PHASE_STATIONARY)
   || hasWheelPhase(phase, WHEEL_PHASE_CHANGED)
   || hasWheelPhase(phase, WHEEL_PHASE_MAY_BEGIN)
 )
 
-export const hasMomentumPhase = (phase) => Number.isFinite(phase) && phase !== 0
+const hasMomentumPhase = (phase) => Number.isFinite(phase) && phase !== 0
 
 export const hasEndedWheelPhase = (phase) => (
   hasWheelPhase(phase, WHEEL_PHASE_ENDED)

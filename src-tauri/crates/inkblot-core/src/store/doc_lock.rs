@@ -36,11 +36,13 @@ impl DocLocks {
             let mut locks = self
                 .locks
                 .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             Arc::clone(locks.entry(key).or_default())
         };
 
-        let _guard = lock.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = lock
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         task()
     }
 }
@@ -100,7 +102,7 @@ mod tests {
         let locks = DocLocks::default();
         locks.with_doc_lock("p", "a", || {
             // Taking a second document's lock from inside the first must not deadlock.
-            locks.with_doc_lock("p", "b", || {})
+            locks.with_doc_lock("p", "b", || {});
         });
     }
 }

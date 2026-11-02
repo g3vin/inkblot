@@ -166,7 +166,7 @@ export const normalizePageSetup = (raw: unknown): PageSetup => {
 }
 
 /** Anything → title page options, or undefined for none. */
-export const normalizeTitlePage = (raw: unknown): TitlePageOptions | undefined => {
+const normalizeTitlePage = (raw: unknown): TitlePageOptions | undefined => {
   if (!raw || typeof raw !== 'object') return undefined
   const r = raw as Record<string, unknown>
   const styles = Object.values(TitlePageStyle)

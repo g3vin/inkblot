@@ -5,7 +5,7 @@
  * it slows or speeds whatever crosses it. These are a starting set a writer can edit
  * or add to on any map. Each also suggests how a region of it is drawn.
  */
-export const DEFAULT_TERRAINS = [
+const DEFAULT_TERRAINS = [
   { id: 'road', name: 'Road', multipliers: { '*land': 1.25, cart: 1.5 }, fill: '#c9a66b', hatch: 'none' },
   { id: 'plains', name: 'Plains', multipliers: {}, fill: '#b9d58a', hatch: 'none' },
   { id: 'forest', name: 'Forest', multipliers: { walk: 0.7, horse: 0.5, gallop: 0.4, cart: 0.3, car: 0.25, '*land': 0.6 }, fill: '#4f8a4b', hatch: 'dots' },

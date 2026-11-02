@@ -3,10 +3,9 @@
  * that stops a stray text autosave from overwriting a canvas with an empty document.
  */
 import { files, mkdir } from './stub-fs.mjs'
-const SRC = '../../src/lib'
-const { saveDocument, loadDocument, getVersions } = await import(`${SRC}/FileSystem.js`)
-const { saveCanvasDocument, loadCanvasDocument } = await import(`${SRC}/canvasFileSystem.js`)
-const { createEmptyCanvas, makeTextNode, makeEdge } = await import(`${SRC}/canvasModel.js`)
+const { saveDocument, loadDocument, getVersions } = await import('../../src/lib/FileSystem.js')
+const { saveCanvasDocument, loadCanvasDocument } = await import('../../src/lib/canvasFileSystem.js')
+const { createEmptyCanvas, makeTextNode, makeEdge } = await import('../../src/lib/canvasModel.js')
 
 import { ok } from './assert.mjs'
 const P = 'Novel'
@@ -55,8 +54,8 @@ ok('inkblot extras quarantined under .inkblot', raw.inkblot.viewport.zoom === 1.
 // --- Renaming a project onto a name another project holds, wherever that one lives.
 // A custom-located project answers to its name through the registry, not through a
 // directory beside the AppData projects, so the check must ask by name.
-const { renameProject } = await import(`${SRC}/FileSystem.js`)
-const { setProjectLocation } = await import(`${SRC}/projectLocations.js`)
+const { renameProject } = await import('../../src/lib/FileSystem.js')
+const { setProjectLocation } = await import('../../src/lib/projectLocations.js')
 await mkdir('/appdata/Novel')
 await setProjectLocation('Elsewhere', '/cloud/Elsewhere')
 files.set('/cloud/Elsewhere/notes.json', '{"content":[],"notes":[]}')

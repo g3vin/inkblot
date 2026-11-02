@@ -17,10 +17,10 @@ import { effectiveKmh, resolveTransport } from './transports'
 import { interceptDays } from './orbits'
 
 /** An impassable stretch is crossed at this fraction of full speed. */
-export const IMPASSABLE_CRAWL = 0.05
+const IMPASSABLE_CRAWL = 0.05
 
 /** The multiplier `terrain` applies to `transport`: by id, then by medium, else 1. */
-export function terrainMultiplier(terrain, transport) {
+function terrainMultiplier(terrain, transport) {
   const multipliers = terrain?.multipliers || {}
   if (Number.isFinite(multipliers[transport.id])) return multipliers[transport.id]
   const byMedium = multipliers[`*${transport.medium}`]
@@ -98,7 +98,7 @@ function legRouteCoords(map, space, leg, day) {
  * The line a leg is travelled along on `day`: its route if it has one, else the
  * straight way (a great circle on the Earth) from `from` to `to`.
  */
-export function legLine(map, space, leg, day = 0) {
+function legLine(map, space, leg, day = 0) {
   const byRoute = leg.route ? legRouteCoords(map, space, leg, day) : null
   if (byRoute && byRoute.length >= 2) return measuredLine(space, byRoute)
   const pins = new Map((map.pins || []).map((pin) => [pin.id, pin]))

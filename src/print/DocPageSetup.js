@@ -94,5 +94,3 @@ export const withPageSetup = (json, setup) => (
     ? { ...json, attrs: { ...(json.attrs || {}), pageSetup: setup } }
     : json
 )
-
-export default DocPageSetup

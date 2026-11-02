@@ -17,7 +17,7 @@ import { buildSchedule, travelerPositionAt } from './timeline'
 /** Kilometres light covers in a day. */
 export const LIGHT_KM_PER_DAY = 299792.458 * 86400
 /** How many points a chart is drawn from. */
-export const DISTANCE_SAMPLES = 200
+const DISTANCE_SAMPLES = 200
 /** The longest span a chart covers: a century. */
 const MAX_SPAN_DAYS = 36525
 
@@ -55,7 +55,7 @@ function locator(map, space, end) {
  * and for bodies twice the longer orbit, so the closest and farthest both show.
  */
 export function distanceSpan(map, a, b, extent) {
-  let from = extent.from
+  const from = extent.from
   let to = extent.to
   if (map.mapKind === 'system') {
     const bodies = new Map(map.system.bodies.map((body) => [body.id, body]))

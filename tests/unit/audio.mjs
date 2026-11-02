@@ -7,15 +7,14 @@
  * the document JSON — re-parsed on every load and copied into every version-history
  * entry. A regression here is invisible until someone's project gets slow.
  */
-const C = '../../src'
-const { normalizeNote } = await import(`${C}/lib/noteUtils.js`)
+const { normalizeNote } = await import('../../src/lib/noteUtils.js')
 const {
   normalizeNoteAudio,
   normalizeAudioClip,
   formatDuration,
   saveAudioClip,
-} = await import(`${C}/lib/audioNotes.js`)
-const { isAudioPath, isImagePath, mimeToExt, isAssetPath } = await import(`${C}/lib/assets.js`)
+} = await import('../../src/lib/audioNotes.js')
+const { isAudioPath, isImagePath, mimeToExt, isAssetPath } = await import('../../src/lib/assets.js')
 import { ok } from './assert.mjs'
 
 /* ---- mime → extension ---- */

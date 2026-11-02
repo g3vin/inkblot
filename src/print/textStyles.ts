@@ -51,7 +51,7 @@ const finite = (v: unknown, d: number, min: number, max: number) => {
 }
 
 /** A stored look, filled in and kept in range. */
-export const normalizeTextStyle = (raw: unknown, base?: TextStyleLook): TextStyleLook | null => {
+const normalizeTextStyle = (raw: unknown, base?: TextStyleLook): TextStyleLook | null => {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const id = typeof r.id === 'string' && r.id.trim() ? r.id.trim() : base?.id
   if (!id) return null

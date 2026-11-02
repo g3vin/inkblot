@@ -29,7 +29,7 @@ const RULED_LINES = [92, 84, 96, 71, 88, 63]
 const KIND_ICON = { canvas: 'canvas', map: 'map', timeline: 'timeline' }
 
 /** @param {{ title?: string, blocks?: { t: string, x: string }[] | null, kind?: string, blank?: boolean, className?: string }} props */
-export const PaperSheet = forwardRef(function PaperSheet({ title, blocks, kind = 'text', blank = false, className, children, ...rest }, ref) {
+export const PaperSheet = forwardRef(({ title, blocks, kind = 'text', blank = false, className, children, ...rest }, ref) => {
   const icon = KIND_ICON[kind]
   // A document that opens on its own name as a heading doesn't need it said twice.
   const named = title && !blank && blocks?.[0]?.x?.trim().toLowerCase() !== title.trim().toLowerCase()

@@ -34,12 +34,12 @@ export function useLayoutPrintActions({ projectName, activeDoc, currentDoc, seco
     }
   }, [activeDoc, currentDoc, editor, projectName, secondaryDoc, secondaryEditor])
   return usePrintLayoutController({
-    projectName: projectName,
+    projectName,
     activeDoc: activeDoc || currentDoc,
     currentDoc,
-    secondaryDoc: secondaryDoc,
+    secondaryDoc,
     editor,
-    secondaryEditor: secondaryEditor,
+    secondaryEditor,
     // What a print or an export was made from is kept in the typeset history.
     onPrint: ({ scope, bound, options }) => {
       runPrintJob({ ...printOptions(scope), scope, bound, options })

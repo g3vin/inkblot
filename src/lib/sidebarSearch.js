@@ -18,11 +18,11 @@ import { collectCanvasMatches } from './canvasSearch'
 import { collectMapMatches } from './map/mapSearch'
 import { getPreference, setPreference, removePreference } from './preferences'
 
-export const MAX_RESULTS_PER_DOCUMENT = 24
-export const MAX_PROJECT_RESULTS = 120
-export const MAX_RECENT_SEARCHES = 6
+const MAX_RESULTS_PER_DOCUMENT = 24
+const MAX_PROJECT_RESULTS = 120
+const MAX_RECENT_SEARCHES = 6
 /** No category runs on past this many rows, so a common word cannot flood the card. */
-export const MAX_PER_CATEGORY = 8
+const MAX_PER_CATEGORY = 8
 
 const PREVIEW_RADIUS = 34
 

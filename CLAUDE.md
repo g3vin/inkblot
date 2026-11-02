@@ -36,8 +36,19 @@ the mock or a fixture.
 - `.claude/rules/` loads the UI, Rust, bridge and test rules when you touch those paths.
   UI work follows [docs/DESIGN.md](docs/DESIGN.md); its brief loads with the UI rule.
 - Skills: `run-app` (see a change in a browser), `add-bridge-message`, `add-toolbar-item`,
-  `design-review`, `perf-review`. Agents: `checks` (runs checks, reports only failures),
-  `explore-inkblot` (read-only locator that knows this map).
+  `design-review`, `perf-review`, `tidy`, `audit`. Agents: `checks` (runs checks, reports
+  only failures), `explore-inkblot` (read-only locator that knows this map).
+
+## Finishing a change
+
+- When a code change is done, run the `tidy` skill before committing or reporting it
+  finished; the Stop hook asks once if you forget. It reviews only what changed since
+  the last tidy, on a lighter model, and fixes what is local and safe.
+- `/audit` reviews the codebase for bugs a slice at a time and keeps a ledger in
+  `.claude/audit/`; `/audit status` lists the open findings.
+- Long implementations go in phases. At the end of each (a commit, a finished step),
+  state the decisions made and the next step in a line or two, and tell the user it is
+  a good moment to `/compact`; you can't compact yourself.
 
 ## Where things live
 
@@ -84,7 +95,8 @@ Full standard: [CONTRIBUTING.md → Comments](CONTRIBUTING.md#comments).
 
 Must pass before you commit ([README → Checks](README.md#checks)):
 
-- `npm run check` (lint with 0 warnings, lint:design, lint:size, typecheck, tests), then `npm run build`.
+- `npm run check` (lint with 0 warnings, lint:design, lint:size, lint:unused, lint:dupes,
+  typecheck, tests), then `npm run build`.
 - Rust or a mirrored module touched: `npm run check:rust` (fmt, clippy, cargo test, parity,
   types:check), then `cd src-tauri && cargo build -q --workspace`.
 

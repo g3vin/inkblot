@@ -25,7 +25,7 @@
  */
 export * from './inkblot-core'
 
-import type { CanvasEdge, CanvasNode, CanvasState, Note } from './inkblot-core'
+import type { CanvasEdge, CanvasNode, CanvasState } from './inkblot-core'
 
 /** Anything we did not model, carried through a round-trip untouched. */
 export type UnknownKeys = Record<string, unknown>
@@ -35,10 +35,6 @@ export type StoredCanvasNode = CanvasNode & UnknownKeys
 
 /** A canvas edge as it exists on disk. */
 export type StoredCanvasEdge = CanvasEdge & UnknownKeys
-
-/** A note as it exists on disk. `normalizeNote` spreads the original note before
- *  overriding the fields it owns, so unknown keys survive (noteUtils.js:107). */
-export type StoredNote = Note & UnknownKeys
 
 /**
  * A whole canvas in memory between a load and the save that follows it.

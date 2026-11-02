@@ -13,7 +13,7 @@ import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
 import { getProjectRoot, joinPath } from '../lib/projectPaths'
 import { pushEntry } from './typesetHistory'
 
-export const TYPESET_HISTORY_FILE = '.inkblot-typeset-history.json'
+const TYPESET_HISTORY_FILE = '.inkblot-typeset-history.json'
 
 const projects = new Map()
 const listeners = new Set()

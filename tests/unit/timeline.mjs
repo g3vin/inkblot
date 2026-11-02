@@ -21,18 +21,17 @@ for (const proto of [dom.window.Element.prototype, dom.window.Range.prototype, d
   proto.getBoundingClientRect ??= noRect
 }
 
-const S = '../../src'
-const T = await import(`${S}/lib/timeline/timelineModel.js`)
-const store = await import(`${S}/lib/timeline/timelineStore.js`)
-const cursor = await import(`${S}/lib/timeline/storyCursor.js`)
-const { boundViewport, calendarTicks, sequenceTicks } = await import(`${S}/lib/timeline/timelineScale.js`)
-const { normalizeRanges } = await import(`${S}/lib/timeline/timelineRanges.js`)
-const { buildLanes } = await import(`${S}/timeline/timelineRows.js`)
-const { saveDocument, saveDocumentTimeline, loadDocument } = await import(`${S}/lib/FileSystem.js`)
-const { getDocKind, isTimelineDoc, withDocSuffix } = await import(`${S}/lib/docKind.js`)
+const T = await import('../../src/lib/timeline/timelineModel.js')
+const store = await import('../../src/lib/timeline/timelineStore.js')
+const cursor = await import('../../src/lib/timeline/storyCursor.js')
+const { boundViewport, calendarTicks, sequenceTicks } = await import('../../src/lib/timeline/timelineScale.js')
+const { normalizeRanges } = await import('../../src/lib/timeline/timelineRanges.js')
+const { buildLanes } = await import('../../src/timeline/timelineRows.js')
+const { saveDocument, saveDocumentTimeline, loadDocument } = await import('../../src/lib/FileSystem.js')
+const { getDocKind, isTimelineDoc, withDocSuffix } = await import('../../src/lib/docKind.js')
 const { Editor } = await import('@tiptap/core')
 const { StarterKit } = await import('@tiptap/starter-kit')
-const anchors = await import(`${S}/extensions/TimelineAnchors.js`)
+const anchors = await import('../../src/extensions/TimelineAnchors.js')
 const { files } = await import('./stub-fs.mjs')
 
 const titles = (tl) => T.sortedEvents(tl).map((event) => event.title).join(' ')
@@ -47,7 +46,7 @@ const ids = () => `id${counter++}`
   for (let i = 0; i < 500; i += 1) keys.push((key = T.keyBetween(key, null)))
   ok('appended keys only ever increase', keys.every((k, i) => i === 0 || keys[i - 1] < k))
   ok('500 appends keep keys short', keys.at(-1).length <= 16)
-  let low = 'V'
+  const low = 'V'
   let high = 'W'
   let dense = true
   for (let i = 0; i < 60; i += 1) {

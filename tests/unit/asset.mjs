@@ -3,8 +3,7 @@
  * and resolving canvas images.
  */
 import { files } from './stub-fs.mjs'
-const L = '../../src/lib'
-const { writeAsset, writeAssetFromFile, importAssetFromPath, assetUrl, isImagePath, isAssetPath, extensionOf } = await import(`${L}/assets.js`)
+const { writeAsset, writeAssetFromFile, importAssetFromPath, assetUrl, isImagePath, isAssetPath, extensionOf } = await import('../../src/lib/assets.js')
 import { ok } from './assert.mjs'
 const P = 'Novel'
 

@@ -12,7 +12,7 @@ import { timerMenuItems } from './timerMenu.js'
 import { formatNumber } from './day.js'
 import { timerClock } from '../components/stats/statsText.js'
 
-export function trayTitle(stats) {
+function trayTitle(stats) {
   const timer = stats.timer
   if (timer.isActive && timer.segment) return timerClock(timer, stats.now())
   const words = stats.status.targets.find((t) => t.target.metric === 'words' || t.target.metric === 'netWords')

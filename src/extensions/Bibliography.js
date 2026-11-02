@@ -16,7 +16,7 @@ import { escapeHtml, htmlToText, tidy } from '../lib/references/format'
 const asList = (value) => (Array.isArray(value) ? value : [])
 
 /** The block's inner DOM, from its attrs. `document` is whichever one is rendering. */
-export function renderBibliographyInto(dom, attrs) {
+function renderBibliographyInto(dom, attrs) {
   dom.textContent = ''
   const doc = dom.ownerDocument
   const heading = doc.createElement('h2')
@@ -169,5 +169,3 @@ export const Bibliography = Node.create({
     }
   },
 })
-
-export default Bibliography

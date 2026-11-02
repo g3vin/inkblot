@@ -19,14 +19,13 @@ import { BODY_ELEMENT } from './elements'
 import { SCRIPT_NODE } from './ScriptElement'
 import { labelScenes, NUMBERED_ELEMENTS, readSceneNumbers } from './sceneNumbers'
 
-export const WRITING_FORMATS = ['prose', 'screenplay', 'stageplay']
+const WRITING_FORMATS = ['prose', 'screenplay', 'stageplay']
 
 /** A document's writing format: 'prose' unless it says otherwise. */
 export const readWritingFormat = (doc) => (WRITING_FORMATS.includes(doc?.attrs?.writingFormat) ? doc.attrs.writingFormat : 'prose')
 
 /* ---------------- scene numbers ---------------- */
 
-export { readSceneNumbers }
 
 /** Every scene heading's number, by position. */
 export const sceneNumbers = (doc) => {
@@ -165,5 +164,3 @@ export const DocWritingFormat = Extension.create({
     })]
   },
 })
-
-export default DocWritingFormat

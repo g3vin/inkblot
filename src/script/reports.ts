@@ -220,7 +220,7 @@ export const REPORT_TITLES: Record<ReportKind, string> = {
 }
 
 /** A report's rows, the first being its column headings. */
-export const reportRows = (report: ReportKind, data: ScriptBreakdown): string[][] => {
+const reportRows = (report: ReportKind, data: ScriptBreakdown): string[][] => {
   switch (report) {
     case 'characters':
       return [

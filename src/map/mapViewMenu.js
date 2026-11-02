@@ -19,7 +19,7 @@ const FLAT_PROJECTIONS = ['equalEarth', 'naturalEarth', 'equirectangular', 'merc
 const IMAGERY = [['map', 'Map'], ['satellite', 'Satellite'], ['hybrid', 'Satellite with labels']]
 
 /** What fetches from the internet, so the writer is asked first. */
-export const ONLINE_OPTIONS = new Set(['earth.imagery.satellite', 'earth.imagery.hybrid', 'earth.streets', 'earth.terrain'])
+const ONLINE_OPTIONS = new Set(['earth.imagery.satellite', 'earth.imagery.hybrid', 'earth.streets', 'earth.terrain'])
 
 const item = (id, label, { checked = false, disabled = false, separator = false } = {}) => ({ id, label, checked, disabled, separator })
 

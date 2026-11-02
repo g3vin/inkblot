@@ -28,9 +28,9 @@ import { systemPositionsAt } from './orbits'
 import './nbody'
 
 /** Samples per segment when a smoothed route is measured — enough to be within 0.1%. */
-export const ROUTE_SMOOTH_SAMPLES = 12
+const ROUTE_SMOOTH_SAMPLES = 12
 /** How finely an Earth route is cut when it is measured and checked for terrain. */
-export const GREAT_CIRCLE_STEP_KM = 50
+const GREAT_CIRCLE_STEP_KM = 50
 
 const planeSpace = (map) => {
   const kmPerUnit = map?.scale?.kmPerUnit > 0 ? map.scale.kmPerUnit : 1
@@ -46,10 +46,10 @@ const planeSpace = (map) => {
 }
 
 /** The distance between two 2D or 3D points; a missing z is 0. */
-export const distance3 = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1], (b[2] || 0) - (a[2] || 0))
+const distance3 = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1], (b[2] || 0) - (a[2] || 0))
 
 /** The point `t` of the way from a to b, keeping z when either has one. */
-export const lerp3 = (a, b, t) => {
+const lerp3 = (a, b, t) => {
   const point = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
   if (a.length > 2 || b.length > 2) point.push((a[2] || 0) + ((b[2] || 0) - (a[2] || 0)) * t)
   return point
@@ -109,7 +109,7 @@ const cartesianSpace = (kmPerUnit) => ({
 })
 
 /** Kilometres in one unit of each 3D kind's space. */
-export function cartesianKmPerUnit(map) {
+function cartesianKmPerUnit(map) {
   if (map?.mapKind === 'galaxy') return KM_PER_LIGHT_YEAR
   if (map?.mapKind === 'universe') return KM_PER_MEGAPARSEC
   return (map?.model?.metresPerUnit > 0 ? map.model.metresPerUnit : 1) / 1000

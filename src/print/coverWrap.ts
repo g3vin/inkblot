@@ -30,7 +30,7 @@ export const SPINE_CLEAR_MM = 1.5875
 /** The barcode's box on the back, bottom right: 2 × 1.2 inches. */
 export const BARCODE_MM = { width: 50.8, height: 30.48, inset: 6.35 }
 /** An e-book's cover is taller than it is wide by this much. */
-export const EBOOK_RATIO = 1.6
+const EBOOK_RATIO = 1.6
 
 export interface WrapGeometry {
   trimWidthMm: number

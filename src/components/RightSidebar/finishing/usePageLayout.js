@@ -15,15 +15,15 @@ import { PAGE_UNITS } from '../../../lib/appEvents'
 
 const send = (type, payload = {}) => shellBridge.send(type, payload)
 
-export const TRACKING_STEP = 5
+const TRACKING_STEP = 5
 const DONE_LINGER_MS = 10000
 
-export const DEFAULT_PRINT_OPTIONS = { range: PrintRange.All, pages: '', watermark: '', recipients: '', scenes: [], highlightCharacter: '' }
+const DEFAULT_PRINT_OPTIONS = { range: PrintRange.All, pages: '', watermark: '', recipients: '', scenes: [], highlightCharacter: '' }
 
-export const recipientNames = (text) => String(text || '').split(/\n/).map((line) => line.trim()).filter(Boolean)
+const recipientNames = (text) => String(text || '').split(/\n/).map((line) => line.trim()).filter(Boolean)
 
 /** The options as the protocol takes them. */
-export const printOptionsOf = (draft) => ({
+const printOptionsOf = (draft) => ({
   range: draft.range,
   pages: draft.pages.trim(),
   watermark: draft.watermark.trim(),

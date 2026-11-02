@@ -32,11 +32,10 @@ for (const proto of [dom.window.Element.prototype, dom.window.Range.prototype, d
 // No app here: `project_locks` is not answered, so the page scans for itself.
 setInvokeHandler(async () => null)
 
-const S = '../../src'
-const FS = await import(`${S}/lib/FileSystem.js`)
-const { saveCanvasDocument } = await import(`${S}/lib/canvasFileSystem.js`)
-const { createEmptyCanvas, makeTextNode } = await import(`${S}/lib/canvasModel.js`)
-const locks = await import(`${S}/lib/docLocks.ts`)
+const FS = await import('../../src/lib/FileSystem.js')
+const { saveCanvasDocument } = await import('../../src/lib/canvasFileSystem.js')
+const { createEmptyCanvas, makeTextNode } = await import('../../src/lib/canvasModel.js')
+const locks = await import('../../src/lib/docLocks.ts')
 
 const P = 'Locks'
 const file = (path) => JSON.parse(files.get(`/appdata/${P}/${path}.json`))
@@ -96,7 +95,7 @@ ok('unlocking a folder removes its marker', !files.has(`/appdata/${P}/Drafts/.in
 const { Editor } = await import('@tiptap/core')
 const { StarterKit } = await import('@tiptap/starter-kit')
 const { TextSelection } = await import('@tiptap/pm/state')
-const { DocumentLock, setEditorLock } = await import(`${S}/extensions/DocumentLock.js`)
+const { DocumentLock, setEditorLock } = await import('../../src/extensions/DocumentLock.js')
 
 const editor = new Editor({
   element: document.getElementById('root').appendChild(document.createElement('div')),
@@ -125,9 +124,9 @@ editor.destroy()
 const React = (await import('react')).default
 const { act } = await import('react')
 const { createRoot } = await import('react-dom/client')
-const { useCanvasDocument } = await import(`${S}/canvas/useCanvasDocument.js`)
-const { useMapDocument } = await import(`${S}/map/useMapDocument.js`)
-const { createEmptyMap } = await import(`${S}/lib/map/mapModel.js`)
+const { useCanvasDocument } = await import('../../src/canvas/useCanvasDocument.js')
+const { useMapDocument } = await import('../../src/map/useMapDocument.js')
+const { createEmptyMap } = await import('../../src/lib/map/mapModel.js')
 
 let canvas = null
 let map = null
@@ -158,7 +157,7 @@ await act(async () => root.unmount())
 
 /* ---------------- the badge ---------------- */
 
-const { default: DocLockBadge } = await import(`${S}/components/DocLockBadge.jsx`)
+const { default: DocLockBadge } = await import('../../src/components/DocLockBadge.jsx')
 await locks.setDocumentLocked(P, 'Two', true)
 const badgeRoot = createRoot(document.getElementById('root').appendChild(document.createElement('div')))
 const badgeHost = document.getElementById('root').lastChild

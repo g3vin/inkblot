@@ -19,10 +19,9 @@ const dom = new JSDOM('<!doctype html><html><body></body></html>')
 installGlobals(dom.window, ['document', 'navigator', 'DOMParser', 'Node', 'Element', 'HTMLElement'])
 Object.defineProperty(globalThis, 'window', { value: dom.window, writable: true, configurable: true })
 
-const C = '../../src'
 const { generateHTML } = await import('@tiptap/core')
 const { getCardExtensions, getCardSchema, getDocPreviewExtensions } =
-  await import(`${C}/lib/editorExtensions.js`)
+  await import('../../src/lib/editorExtensions.js')
 import { ok } from './assert.mjs'
 
 const render = (content) => generateHTML(content, getCardExtensions())
@@ -40,7 +39,7 @@ ok('getCardExtensions is stable (safe to memo against)', getCardExtensions() ===
 
 /* ---- a plain card ---- */
 
-let html = render(doc(para('Hello canvas')))
+const html = render(doc(para('Hello canvas')))
 ok('a paragraph renders', html.includes('Hello canvas') && html.includes('<p>'))
 
 /* ---- every mark the titlebar Toolbar can apply must survive ---- */

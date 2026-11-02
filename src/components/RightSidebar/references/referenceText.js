@@ -18,7 +18,7 @@ export function sourceUrl(reference) {
 }
 
 /** What a filter reads of a source. */
-export const searchText = (view) => [
+const searchText = (view) => [
   view.entryText, view.inText, view.reference.note, view.reference.annotation, ...(view.reference.tags ?? []),
 ].join(' ').toLowerCase()
 

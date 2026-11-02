@@ -44,14 +44,8 @@ export function cubicBezier(x1, y1, x2, y2) {
   }
 }
 
-/** `cubic-bezier(0.2, 0.7, 0.2, 1)` → an easing function, or null for anything else. */
-export function parseCubicBezier(value) {
-  const match = /cubic-bezier\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)/.exec(value || '')
-  return match ? cubicBezier(...match.slice(1).map(Number)) : null
-}
-
 /** An ease-out, for a flight given no easing of its own (the tests). */
-export const easeOut = cubicBezier(0.2, 0.7, 0.2, 1)
+const easeOut = cubicBezier(0.2, 0.7, 0.2, 1)
 
 const lerp = (a, b, p) => a + (b - a) * p
 const round = (value) => Math.round(value * 1000) / 1000
@@ -59,7 +53,7 @@ const round = (value) => Math.round(value * 1000) / 1000
 const smooth = (t) => t * t * (3 - 2 * t)
 
 /** Where the paper is at progress `p` from `from` (a sheet, turned) to `to` (the card, upright). */
-export function geometryAt(from, to, p) {
+function geometryAt(from, to, p) {
   return {
     x: lerp(from.left + from.width / 2, to.left + to.width / 2, p),
     y: lerp(from.top + from.height / 2, to.top + to.height / 2, p),

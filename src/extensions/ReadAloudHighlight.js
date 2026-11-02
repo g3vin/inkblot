@@ -9,7 +9,7 @@ import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 
-export const READ_ALOUD_HIGHLIGHT_PLUGIN_KEY = new PluginKey('readAloudHighlight')
+const READ_ALOUD_HIGHLIGHT_PLUGIN_KEY = new PluginKey('readAloudHighlight')
 
 const EMPTY_DECORATIONS = DecorationSet.empty
 

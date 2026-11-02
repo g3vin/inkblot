@@ -5,7 +5,7 @@
 import { getPreference, setPreference } from '../../../lib/preferences'
 import { PAGE_UNITS } from '../../../lib/appEvents'
 
-export const UNITS_KEY = 'inkblot.pageUnits'
+const UNITS_KEY = 'inkblot.pageUnits'
 
 export const UNITS = {
   in: { label: 'Inches', perMm: 1 / 25.4, digits: 3 },
@@ -15,7 +15,7 @@ export const UNITS = {
 }
 
 /** Inches where the paper is Letter, millimetres everywhere else. */
-export const defaultUnit = () => {
+const defaultUnit = () => {
   const locale = (typeof navigator !== 'undefined' && navigator.language) || 'en-US'
   return /-(US|LR|MM)$/i.test(locale) ? 'in' : 'mm'
 }

@@ -11,8 +11,8 @@
  * this has no Rust twin.
  */
 
-export const MAP_MIN_ZOOM = 0.02
-export const MAP_MAX_ZOOM = 256
+const MAP_MIN_ZOOM = 0.02
+const MAP_MAX_ZOOM = 256
 export const MAP_ZOOM_STEP = 1.25
 
 export const clampMapZoom = (zoom) =>

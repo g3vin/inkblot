@@ -27,7 +27,7 @@ import { BLANK_SHEET } from './mapModel'
 import { systemPositionsAt } from './orbits'
 
 /** The width of the world an Earth map is drawn into. */
-export const EARTH_WORLD_WIDTH = 4096
+const EARTH_WORLD_WIDTH = 4096
 /** World units per AU at scale 1 on a star system (display.pxPerAU overrides). */
 const DEFAULT_PX_PER_AU = 100
 /** The log-radial scale's knee: nearer than this the scale is near-linear. */
@@ -53,7 +53,7 @@ export const PROJECTION_NAMES = {
 }
 
 /** A d3 projection for an Earth map, sized to EARTH_WORLD_WIDTH. */
-export function makeEarthProjection(earth) {
+function makeEarthProjection(earth) {
   const name = PROJECTIONS[earth?.projection] ? earth.projection : 'equalEarth'
   const projection = PROJECTIONS[name]()
   const rotate = Array.isArray(earth?.rotate) ? earth.rotate : [0, 0]
@@ -74,7 +74,7 @@ export function makeEarthProjection(earth) {
 }
 
 /** A key that changes exactly when the projected picture would. */
-export const projectionKey = (earth) =>
+const projectionKey = (earth) =>
   `${earth?.projection || 'equalEarth'}:${(earth?.rotate || [0, 0]).map((value) => Math.round(value * 100) / 100).join(',')}`
 
 /* ---------- star-system display scale ---------- */

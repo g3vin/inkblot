@@ -5,10 +5,10 @@
 import { forwardRef } from 'react'
 import './ui.css'
 
-const Button = forwardRef(function Button(
+const Button = forwardRef((
   { variant = 'plain', size = 'capsule', className = '', type = 'button', children, ...rest },
   ref,
-) {
+) => {
   return (
     <button
       ref={ref}

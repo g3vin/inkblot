@@ -4,10 +4,10 @@
  * The public pidgets endpoint serves boards that need no login; private boards
  * and sections fall back to the session scraper in lib/pinterestScrape.js.
  */
-export const PINTEREST_SCRIPT_ID = 'inkblot-pinterest-pinit-js'
-export const PINTEREST_SCRIPT_SRC = 'https://assets.pinterest.com/js/pinit.js'
+const PINTEREST_SCRIPT_ID = 'inkblot-pinterest-pinit-js'
+const PINTEREST_SCRIPT_SRC = 'https://assets.pinterest.com/js/pinit.js'
 
-export const PINTEREST_PIDGETS_BASE = 'https://widgets.pinterest.com/v3/pidgets/boards'
+const PINTEREST_PIDGETS_BASE = 'https://widgets.pinterest.com/v3/pidgets/boards'
 
 export const parsePinterestBoardParts = (pinterestUrl) => {
   if (!pinterestUrl) return null

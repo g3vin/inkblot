@@ -22,8 +22,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { anchorBlock } from './TypesetAnchors'
 import { TYPESET_META } from './TypesetLock'
 
-export const TRACKING_LIMIT = 10
-export const TRACKING_STEP = 5
+const TRACKING_LIMIT = 10
 
 export interface ParagraphTypesetPatch {
   tracking?: number
@@ -35,7 +34,7 @@ export interface ParagraphTypesetPatch {
   styleName?: string | null
 }
 
-export const clampTracking = (n: number): number => Math.max(-TRACKING_LIMIT, Math.min(TRACKING_LIMIT, Math.round(n)))
+const clampTracking = (n: number): number => Math.max(-TRACKING_LIMIT, Math.min(TRACKING_LIMIT, Math.round(n)))
 
 /** What is set on a paragraph, with nothing set as the defaults. */
 export const paragraphTypesetOf = (node: PMNode | null | undefined) => ({
