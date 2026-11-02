@@ -608,7 +608,7 @@
   border-radius: var(--radius-md);
   border: 1px solid var(--accent-border);
   background: var(--accent-surface-strong);
-  transition: inset var(--sidebar-tabs-grow-duration, 260ms) var(--sidebar-tabs-grow-easing, ease),
+  transition: inset var(--sidebar-tabs-grow-duration, var(--spring-smooth-dur)) var(--sidebar-tabs-grow-easing, var(--spring-smooth)),
     box-shadow var(--spring-quick-dur) var(--spring-quick);
 }
 

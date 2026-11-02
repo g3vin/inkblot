@@ -143,7 +143,7 @@
   pointer-events: none;
   opacity: 1;
   transform: none;
-  animation: note-card-unpop var(--note-close-ms, 126ms) var(--spring-exit) var(--note-close-delay, 0ms) forwards;
+  animation: note-card-unpop var(--note-close-ms, var(--spring-exit-dur)) var(--spring-exit) var(--note-close-delay, 0ms) forwards;
 }
 
 @keyframes note-card-unpop {

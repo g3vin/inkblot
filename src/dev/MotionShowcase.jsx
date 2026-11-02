@@ -1,11 +1,15 @@
 /**
  * MotionShowcase.jsx — the showcase's Motion section (docs/DESIGN.md §7): each spring's
- * curve, a puck to flick between stops (projection, the rubber band, momentum's
- * overshoot) and a box to send back and forth mid-flight (a retarget keeps its speed).
+ * curve, a puck to flick between stops (projection, the rubber band for the input
+ * pulling it, a bounce as big as the throw) and a box to send back and forth
+ * mid-flight (a retarget keeps its speed).
  */
 import { useRef, useState } from 'react'
 import { Button, Card } from '../ui'
-import { SPRINGS, nearestTarget, project, rubberClamp, settleTime, spring, springAt, trackSample, velocityFrom } from '../ui/physics.js'
+import {
+  SPRINGS, project, releaseSpring, rubberClamp, rubberCoefficient, rubberSlope, rubberUnclamp, settleOnTargets,
+  settleTime, spring, springAt, trackSample, velocityFrom,
+} from '../ui/physics.js'
 import { useSpring } from '../ui/useSpring.js'
 
 const CURVE_W = 200
@@ -37,12 +41,17 @@ function SpringCurve({ name, preset }) {
 
 const STOPS = [0, 0.5, 1]
 
-/** Drag and let go: it lands on the stop nearest where the throw would coast to. */
+/**
+ * Drag and let go: it lands on the stop nearest where the throw would coast to, with a
+ * bounce as big as the throw. Caught mid-flight, even past an end, it stays where it
+ * is drawn.
+ */
 function FlickDemo() {
   const railRef = useRef(null)
   const puckRef = useRef(null)
   const ghostRef = useRef(null)
   const drag = useRef(null)
+  const [landed, setLanded] = useState(null)
   const x = useSpring(0, {
     spring: SPRINGS.momentum,
     onChange: (value) => { if (puckRef.current) puckRef.current.style.translate = `${value}px 0` },
@@ -52,25 +61,35 @@ function FlickDemo() {
   const onPointerDown = (event) => {
     event.currentTarget.setPointerCapture?.(event.pointerId)
     x.stop()
-    drag.current = { grab: event.clientX - x.value, samples: [] }
+    const band = rubberCoefficient(event.pointerType)
+    const span = width()
+    // Where the hand would have to be for the puck to be drawn where it is.
+    const held = rubberUnclamp(x.value, 0, span, span, band)
+    drag.current = { grab: event.clientX - held, band, samples: [] }
   }
   const onPointerMove = (event) => {
     if (!drag.current) return
     const raw = event.clientX - drag.current.grab
     trackSample(drag.current.samples, { t: performance.now(), x: raw })
-    x.jump(rubberClamp(raw, 0, width(), width()))
+    x.jump(rubberClamp(raw, 0, width(), width(), drag.current.band))
   }
-  const onPointerUp = () => {
+  const onPointerUp = (event) => {
     if (!drag.current) return
-    const velocity = velocityFrom(drag.current.samples).x
+    const { samples, band } = drag.current
     drag.current = null
     const span = width()
-    const landing = nearestTarget(x.value, velocity, STOPS.map((stop) => stop * span))
+    const hand = velocityFrom(samples, undefined, event.timeStamp).x
+    // Past an end the puck is drawn moving slower than the hand.
+    const raw = samples.length ? samples[samples.length - 1].x : x.value
+    const velocity = hand * rubberSlope(raw, 0, span, span, band)
+    const landing = settleOnTargets({ position: x.value, velocity, targets: STOPS.map((stop) => stop * span) })
     if (ghostRef.current) {
       ghostRef.current.style.translate = `${Math.max(0, Math.min(span, x.value + project(velocity)))}px 0`
       ghostRef.current.dataset.shown = 'true'
     }
-    x.set(landing, { velocity })
+    const preset = releaseSpring(velocity)
+    setLanded(preset.bounce)
+    x.set(landing, { velocity, spring: preset })
   }
 
   return (
@@ -89,7 +108,11 @@ function FlickDemo() {
           onPointerCancel={onPointerUp}
         />
       </div>
-      <p className="ib-meta">The ring marks where the throw would coast to.</p>
+      <p className="ib-meta">
+        {landed === null
+          ? 'The ring marks where the throw would coast to.'
+          : `The ring marks where the throw would coast to · landed with bounce ${landed}`}
+      </p>
     </Card>
   )
 }

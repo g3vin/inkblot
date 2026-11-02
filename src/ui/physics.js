@@ -34,7 +34,10 @@ export const SPRINGS = Object.freeze({
   gentle: Object.freeze({ duration: 550, bounce: 0 }),
   /** A thing leaving the way it came, quicker than it arrived. */
   exit: Object.freeze({ duration: 160, bounce: 0 }),
-  /** After a flick or a drag: the release's speed carries it a little past. */
+  /**
+   * After a flick or a drag: the release's speed carries it a little past. The most a
+   * release gets; `releaseSpring` gives a slower one less.
+   */
   momentum: Object.freeze({ duration: 350, bounce: 0.15 }),
   /**
    * Things tied to what the hand is moving, as on a string: a dragged note's children
@@ -47,11 +50,33 @@ export const SPRINGS = Object.freeze({
 /** How quickly a coasting thing slows, per millisecond (UIScrollView's rates). */
 export const DECELERATION = Object.freeze({ normal: 0.998, fast: 0.99 })
 
-/** How far past an edge a rubber band lets things go: Apple's constant. */
-export const RUBBER_BAND = 0.55
+/**
+ * How much a rubber band gives, by what is pulling it: UIKit's coefficients per input
+ * (`-[UIScrollView _currentRubberBandCoefficient]`). A finger drags the content itself
+ * and gets the most give; a mouse or a trackpad moves a pointer over it, and an edge
+ * that gave as much would feel loose.
+ */
+export const RUBBER_BANDS = Object.freeze({ touch: 0.55, pen: 0.55, mouse: 0.4, trackpad: 0.17 })
+
+/** The rubber band for an input: a `pointerType`, or 'trackpad' for wheel gestures. */
+export const rubberCoefficient = (input) => RUBBER_BANDS[input] ?? RUBBER_BANDS.touch
 
 /** How far back a release's speed is measured. */
 export const VELOCITY_WINDOW_MS = 90
+
+/**
+ * The thresholds a gesture decides by.
+ *   slop    how far a press moves before it is a drag (Euclidean px): a finger is
+ *           imprecise and gets Apple's 10pt, a pointer 4px
+ *   flick   release speed (px/ms) that counts as thrown: iOS pages on ≥ 300pt/s
+ *   pause   slower than this (px/ms) the hand has stopped
+ */
+export const GESTURE = Object.freeze({ slop: { pointer: 4, touch: 10 }, flick: 0.3, pause: 0.05 })
+
+/** Whether a press that has moved (`dx`, `dy`) is now a drag. */
+export const pastSlop = (dx, dy, pointerType = 'mouse') => (
+  Math.hypot(dx, dy) >= (pointerType === 'touch' ? GESTURE.slop.touch : GESTURE.slop.pointer)
+)
 
 const TAU = Math.PI * 2
 
@@ -116,20 +141,24 @@ export function springAt(preset, from, to, velocity, t) {
 }
 
 /**
- * How long until the spring is still: within `precision` of where it is going (as a
- * fraction of the distance, or absolute when the distance is 0) and slower than
- * `precision` of it per 16ms.
+ * How long until the spring is still for good: within `precision` of where it is going
+ * (as a fraction of the distance, or absolute when the distance is 0) and slower than
+ * `precision` of it per 16ms, and never outside that again. A bouncy spring passes
+ * through its target on the way to its overshoot, so the first moment it looks still
+ * is not when it is.
  */
 export function settleTime(preset, { from = 0, to = 1, velocity = 0, precision = 0.005 } = {}) {
   const params = paramsOf(preset)
   const distance = Math.abs(to - from) || 1
   const limit = (TAU / params.omega) * 4
+  let settled = 0
   for (let t = 0; t <= limit; t += 4) {
     const state = springAt(params, from, to, velocity, t)
-    if (Math.abs(state.value - to) <= precision * distance
-      && Math.abs(state.velocity) * 16 <= precision * distance) return t
+    const still = Math.abs(state.value - to) <= precision * distance
+      && Math.abs(state.velocity) * 16 <= precision * distance
+    if (!still) settled = t + 4
   }
-  return limit
+  return Math.min(settled, limit)
 }
 
 /**
@@ -167,6 +196,12 @@ const simplify = (points, tolerance) => {
 const fixed = (n, digits) => String(Number(n.toFixed(digits)))
 
 /**
+ * How close a CSS curve gets before its last stop puts it on 1: under a pixel in 300.
+ * Finer only lengthens the `-dur` tokens that hand-offs wait on, for no visible change.
+ */
+const EASING_PRECISION = 0.002
+
+/**
  * A spring as a CSS easing: `{ easing: 'linear(…)', duration }`, the duration being
  * the settle time in ms. From rest by default; `velocity` sets it off at that speed,
  * in progress (of the whole distance) per ms, so a release's speed can be baked into
@@ -175,7 +210,7 @@ const fixed = (n, digits) => String(Number(n.toFixed(digits)))
  */
 export function springEasing(preset, { tolerance = 0.002, velocity = 0 } = {}) {
   const params = paramsOf(preset)
-  const duration = settleTime(params, { velocity })
+  const duration = settleTime(params, { velocity, precision: EASING_PRECISION })
   const steps = Math.max(32, Math.round(duration / 4))
   const points = []
   for (let i = 0; i <= steps; i += 1) {
@@ -189,6 +224,32 @@ export function springEasing(preset, { tolerance = 0.002, velocity = 0 } = {}) {
     return i === 0 || i === kept.length - 1 ? value : `${value} ${fixed(p.t * 100, 2)}%`
   })
   return { easing: `linear(${stops.join(', ')})`, duration: Math.round(duration) }
+}
+
+const smoothstep = (edge0, edge1, x) => {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)))
+  return t * t * (3 - 2 * t)
+}
+
+/** Above this release speed (px/ms) a landing gets all of `momentum`'s bounce. */
+const FULL_BOUNCE_SPEED = 1.5
+
+const releaseSprings = new Map()
+
+/**
+ * The spring a release lands on: `momentum`, with its bounce scaled by how hard the
+ * hand let go (`speed`, px/ms). A slow let-go lands dead; only a flick overshoots, as
+ * Apple rewards momentum. Shared per bounce, so callers may compare them by identity.
+ */
+export function releaseSpring(speed) {
+  const bounce = Math.round(SPRINGS.momentum.bounce * smoothstep(GESTURE.flick, FULL_BOUNCE_SPEED, Math.abs(speed)) * 100) / 100
+  if (bounce >= SPRINGS.momentum.bounce) return SPRINGS.momentum
+  let preset = releaseSprings.get(bounce)
+  if (!preset) {
+    preset = Object.freeze({ duration: SPRINGS.momentum.duration, bounce })
+    releaseSprings.set(bounce, preset)
+  }
+  return preset
 }
 
 /** The same spring for framer-motion, so the two never drift apart. */
@@ -229,34 +290,133 @@ export function nearestTarget(position, velocity, targets, rate = DECELERATION.n
 }
 
 /**
- * Past an edge, `offset` beyond it moves only part of the way, less and less the
- * further it is pulled, and never more than `dimension`: Apple's rubber band.
+ * Where a release at `position` moving at `velocity` lands among `targets`: the one
+ * nearest where it would coast to (`nearestTarget`), so a flick decides by where it
+ * was going and a slow let-go by where it is. With `from` and `maxStep`, it lands no
+ * further than `maxStep` targets from `from`, as a page view turns one page per flick.
  */
-export function rubberBand(offset, dimension, constant = RUBBER_BAND) {
+export function settleOnTargets({ position, velocity, targets, rate = DECELERATION.normal, from, maxStep = Infinity }) {
+  let candidates = targets
+  if (from !== undefined && Number.isFinite(maxStep)) {
+    const sorted = [...targets].sort((a, b) => a - b)
+    const home = sorted.indexOf(nearestTarget(from, 0, sorted))
+    candidates = sorted.slice(Math.max(0, home - maxStep), home + maxStep + 1)
+  }
+  return nearestTarget(position, velocity, candidates, rate)
+}
+
+/**
+ * Past an edge, `offset` beyond it moves only part of the way, less and less the
+ * further it is pulled, and never more than `dimension`: Apple's rubber band,
+ * `c·x·d / (d + c·x)`, with `c` from `rubberCoefficient` for the input pulling it.
+ */
+export function rubberBand(offset, dimension, constant = RUBBER_BANDS.touch) {
   if (!offset || dimension <= 0) return 0
   const give = (1 - 1 / ((Math.abs(offset) * constant) / dimension + 1)) * dimension
   return Math.sign(offset) * give
 }
 
+/**
+ * The pull that `rubberBand` shows as `shown`: how far past the edge the hand must be
+ * for the edge to be drawn there, so an edge caught as it springs back is held where
+ * it is drawn rather than jumping to the hand.
+ */
+export function unRubberBand(shown, dimension, constant = RUBBER_BANDS.touch) {
+  if (!shown || dimension <= 0) return 0
+  const x = Math.min(Math.abs(shown), dimension * 0.999)
+  return Math.sign(shown) * ((dimension * x) / (constant * (dimension - x)))
+}
+
 /** `value` held to [min, max] with rubber-banded give past either end. */
-export function rubberClamp(value, min, max, dimension, constant = RUBBER_BAND) {
+export function rubberClamp(value, min, max, dimension, constant = RUBBER_BANDS.touch) {
   if (value < min) return min + rubberBand(value - min, dimension, constant)
   if (value > max) return max + rubberBand(value - max, dimension, constant)
   return value
 }
 
+/** The inverse of `rubberClamp`: the unbanded value that is drawn at `shown`. */
+export function rubberUnclamp(shown, min, max, dimension, constant = RUBBER_BANDS.touch) {
+  if (shown < min) return min + unRubberBand(shown - min, dimension, constant)
+  if (shown > max) return max + unRubberBand(shown - max, dimension, constant)
+  return shown
+}
+
+/**
+ * How fast `rubberClamp` moves for each unit of pull at `value`: 1 inside, less past
+ * either end. A release past an edge hands the spring the speed the edge was drawn
+ * moving at, which is the hand's speed times this.
+ */
+export function rubberSlope(value, min, max, dimension, constant = RUBBER_BANDS.touch) {
+  const over = value < min ? min - value : value > max ? value - max : 0
+  if (!over || dimension <= 0) return 1
+  return constant / (1 + (constant * over) / dimension) ** 2
+}
+
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
+
+/** Least-squares slope of `key` over time through `points` (at least two). */
+function slope(points, key) {
+  const n = points.length
+  let mt = 0
+  let mv = 0
+  for (const p of points) { mt += p.t; mv += p[key] ?? 0 }
+  mt /= n
+  mv /= n
+  let num = 0
+  let den = 0
+  for (const p of points) {
+    const dt = p.t - mt
+    num += dt * ((p[key] ?? 0) - mv)
+    den += dt * dt
+  }
+  return den > 0 ? num / den : 0
+}
+
+/** The samples in the `windowMs` before `at`, with the hand held still at `at` if it has been. */
+function recent(samples, windowMs, at) {
+  const last = samples[samples.length - 1]
+  const points = samples.filter((sample) => sample.t >= at - windowMs && sample.t <= at)
+  // A pointer that stops sends no more moves; a gap over a frame since the last one
+  // is the hand holding still, and counts as a sample where it was.
+  if (at - last.t > 20) points.push({ t: at, x: last.x, y: last.y })
+  if (points.length < 2) {
+    const before = samples.filter((sample) => sample.t <= at)
+    return before.slice(-2)
+  }
+  return points
+}
+
 /**
  * A pointer's speed from its recent samples (`{ t, x, y? }`, oldest first) in
- * units/ms: over the last `windowMs`, so a hand that slows before lifting is read as
- * slow, and never from only the last two samples, which jitter.
+ * units/ms at the moment `at` (the release; now by default): fitted over the last
+ * `windowMs`, so a hand that slows before lifting is read as slow and one jittery
+ * event counts for little. A hand that held still longer than the window before
+ * letting go has no speed, so a drag that stops and then lifts is never thrown.
  */
-export function velocityFrom(samples, windowMs = VELOCITY_WINDOW_MS) {
+export function velocityFrom(samples, windowMs = VELOCITY_WINDOW_MS, at = now()) {
   if (!samples || samples.length < 2) return { x: 0, y: 0 }
   const last = samples[samples.length - 1]
-  let first = samples.find((sample) => last.t - sample.t <= windowMs) ?? samples[0]
-  if (first === last) first = samples[samples.length - 2]
-  const dt = Math.max(1, last.t - first.t)
-  return { x: (last.x - first.x) / dt, y: ((last.y ?? 0) - (first.y ?? 0)) / dt }
+  const when = Math.max(at, last.t)
+  if (when - last.t > windowMs) return { x: 0, y: 0 }
+  const points = recent(samples, windowMs, when)
+  if (points.length < 2 || points[points.length - 1].t - points[0].t < 1) return { x: 0, y: 0 }
+  return { x: slope(points, 'x'), y: slope(points, 'y') }
+}
+
+/**
+ * Whether the hand has just stopped, read from its samples as Apple reads it: a sharp
+ * fall in speed, which comes sooner than any timer could tell, or a hand that has been
+ * slow for a while. For a drag that acts on a pause (a dwell over a folder).
+ */
+export function isPausing(samples, at = now(), { recentMs = 32, priorMs = 64 } = {}) {
+  if (!samples || samples.length < 2) return false
+  const speed = (v) => Math.hypot(v.x, v.y)
+  const latest = speed(velocityFrom(samples, recentMs, at))
+  if (latest >= GESTURE.pause) return false
+  const before = speed(velocityFrom(samples, priorMs, at - recentMs))
+  const braked = (before - latest) / recentMs > GESTURE.pause / recentMs
+  const still = before < GESTURE.pause && at - samples[0].t >= recentMs + priorMs
+  return braked || still
 }
 
 /** Keeps the last `windowMs` of a pointer's path, for `velocityFrom`. */

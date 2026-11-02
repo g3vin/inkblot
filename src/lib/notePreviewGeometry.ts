@@ -22,7 +22,6 @@ export const HIDE_DELAY_MS = 110
 export const RESIZE_GRIP = 6
 /** The band across a card's top that moves it, as a window's titlebar does. */
 export const MOVE_BAND = 28
-export const DRAG_MIN_DELTA = 3
 /** Leaving a note's dot or card: how far the pointer may drift back from every card
  *  before they close, and how long it may pause on the way to one. */
 export const HOVER_INTENT_SLACK = 6
@@ -358,12 +357,14 @@ export const addPointerDragListeners = (
 ): (() => void) => {
   window.addEventListener('pointermove', handlePointerMove, true)
   window.addEventListener('pointerup', handlePointerUp, true)
+  window.addEventListener('pointercancel', handlePointerUp, true)
   target?.addEventListener?.('pointermove', handlePointerMove, true)
   target?.addEventListener?.('pointerup', handlePointerUp, true)
 
   return () => {
     window.removeEventListener('pointermove', handlePointerMove, true)
     window.removeEventListener('pointerup', handlePointerUp, true)
+    window.removeEventListener('pointercancel', handlePointerUp, true)
     target?.removeEventListener?.('pointermove', handlePointerMove, true)
     target?.removeEventListener?.('pointerup', handlePointerUp, true)
   }

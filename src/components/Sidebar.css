@@ -330,6 +330,12 @@
   animation: sidebar-arrive-right var(--spring-smooth-dur) var(--spring-smooth) calc(var(--spring-quick-dur) / 2) both;
 }
 
+/* Reduce motion shortens the slide to nothing but not its delay, which would leave the
+   sidebar missing for a moment: it is simply there. */
+@media (prefers-reduced-motion: reduce) {
+  .editor-page-wrapper[data-arrival] .sidebar.is-docked { animation: none; }
+}
+
 @keyframes sidebar-arrive-left {
   from {
     opacity: 0;

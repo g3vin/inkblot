@@ -27,10 +27,16 @@
   cursor: pointer;
   white-space: nowrap;
   transition: background var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick),
-    opacity var(--spring-quick-dur) var(--spring-quick);
+    opacity var(--spring-quick-dur) var(--spring-quick), scale var(--spring-quick-dur) var(--spring-quick);
 }
 
 .ui-button:hover { border-color: transparent; }
+/* Pressed, it gives at once, with no transition: the hand must feel the press the
+   moment it lands. Let go, the transition above springs it back. */
+.ui-button:not(:disabled, [aria-disabled='true']):active {
+  scale: var(--press-scale);
+  transition-duration: 0s;
+}
 .ui-button:focus { outline: none; }
 .ui-button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .ui-button:disabled,
@@ -107,9 +113,11 @@
   color: var(--text-secondary);
   font: 500 12px/1 var(--font-ui);
   cursor: pointer;
-  transition: background var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick);
+  transition: background var(--spring-quick-dur) var(--spring-quick), color var(--spring-quick-dur) var(--spring-quick),
+    scale var(--spring-quick-dur) var(--spring-quick);
 }
 .ui-segment:hover { background: var(--hover-bg); border-color: transparent; }
+.ui-segment:not(:disabled):active { scale: var(--press-scale); transition-duration: 0s; }
 .ui-segment:focus { outline: none; }
 .ui-segment:focus-visible { outline: 2px solid var(--accent-border); }
 .ui-segment[aria-checked='true'] { background: var(--surface-float); color: var(--text-primary); box-shadow: 0 0 0 0.5px var(--border-color), 0 1px 2px var(--shadow-color); }

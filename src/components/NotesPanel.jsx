@@ -18,7 +18,7 @@ import {
 } from '../lib/noteUtils'
 import { EmptyState } from '../ui/Surfaces.jsx'
 import { NOTE_POP_MS, closeSchedule, drawMs, lineStart, openTiming, prefersReducedMotion } from '../lib/noteReveal'
-import { SPRINGS } from '../ui/physics.js'
+import { SPRINGS, pastSlop } from '../ui/physics.js'
 import { springTiming } from '../ui/useSpring.js'
 
 const findBranch = (branches, id) => {
@@ -105,9 +105,7 @@ function useNoteCanvasDrag(docName, setGhost) {
         if (!drag) return
 
         if (!drag.dragging) {
-          const moved =
-            Math.abs(moveEvent.clientX - drag.startX) + Math.abs(moveEvent.clientY - drag.startY)
-          if (moved < 4) return
+          if (!pastSlop(moveEvent.clientX - drag.startX, moveEvent.clientY - drag.startY, moveEvent.pointerType)) return
           drag.dragging = true
 
           // Starting from the textarea would otherwise drag-SELECT its text as the

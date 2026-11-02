@@ -32,9 +32,11 @@ function fallbackCurve(preset, duration) {
   const samples = Array.from({ length: 40 }, (_, i) => (i + 1) / 41)
   const truth = samples.map((p) => springAt(params, 0, 1, 0, p * duration).value)
   let best = null
-  for (let x1 = 0; x1 <= 0.6; x1 += 0.05) {
-    for (let y1 = 0; y1 <= 1.6; y1 += 0.05) {
-      for (let x2 = 0; x2 <= 0.6; x2 += 0.05) {
+  // Whole steps, scaled: adding 0.05 over and over drifts and skips the last value.
+  for (let i = 0; i <= 12; i += 1) {
+    for (let j = 0; j <= 32; j += 1) {
+      for (let k = 0; k <= 12; k += 1) {
+        const [x1, y1, x2] = [i * 0.05, j * 0.05, k * 0.05]
         const ease = cubicBezier(x1, y1, x2, 1)
         let error = 0
         for (let i = 0; i < samples.length; i += 1) error += (ease(samples[i]) - truth[i]) ** 2

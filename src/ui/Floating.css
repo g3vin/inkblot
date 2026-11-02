@@ -31,10 +31,15 @@
   border-radius: 50%;
   color: var(--accent-foreground);
   cursor: pointer;
-  transition: transform var(--spring-quick-dur) var(--spring-quick);
+  transition: transform var(--spring-quick-dur) var(--spring-quick), scale var(--spring-quick-dur) var(--spring-quick);
 }
 
 :root[data-platform='ios'] .ib-fab { border-radius: 50%; }
 .ib-fab:hover { transform: translateY(-1px); }
-.ib-fab:active { transform: translateY(0.5px); }
+/* Pressed, it gives at once; let go, it springs back (as .ui-button does). */
+.ib-fab:active {
+  transform: translateY(0.5px);
+  scale: var(--press-scale);
+  transition-duration: 0s;
+}
 .ib-fab:focus-visible { outline: none; box-shadow: var(--focus-ring), var(--shadow-float); }

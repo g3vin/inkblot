@@ -14,6 +14,7 @@
  * chronology to move it — every passage's line follows, here and everywhere.
  */
 import { useMemo, useRef, useState } from 'react'
+import { GESTURE } from '../ui/physics.js'
 import { canvasSurfaceAt, dispatchCanvasDropTimelineEvent } from '../canvas/canvasEvents'
 import { getDocDisplayName } from '../lib/docKind'
 import { formatDay } from '../lib/map/calendar'
@@ -71,7 +72,7 @@ export default function TimelineManuscript({
     let lastEdit = null
     let label = 'Move event'
     const onMove = (move) => {
-      if (!moved && Math.abs(move.clientX - originX) < 4) return
+      if (!moved && Math.abs(move.clientX - originX) < GESTURE.slop.pointer) return
       moved = true
       const dx = (move.clientX - originX) / px
       if (axis === 'time' && isDated(event)) {
@@ -88,6 +89,7 @@ export default function TimelineManuscript({
     const onUp = (up) => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
       const canvas = moved ? canvasSurfaceAt(up.clientX, up.clientY) : null
       if (canvas) {
         cancelTimelinePreview(projectName)
@@ -97,6 +99,7 @@ export default function TimelineManuscript({
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
   }
 
   const eventX = (thread) => toX(thread.at)

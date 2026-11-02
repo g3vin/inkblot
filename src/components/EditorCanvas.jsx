@@ -17,7 +17,7 @@
  *
  * tests/unit/editor.mjs mounts this component and exercises all of them.
  */
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useEditor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
@@ -59,7 +59,7 @@ import { lockReason, useLocks } from '../lib/docLocks'
 import { setEditorLock } from '../extensions/DocumentLock'
 import { Skeleton, SkeletonOverlay } from '../ui/Reveal.jsx'
 import { SPLIT_RATIO_MAX, SPLIT_RATIO_MIN, clampSplitRatio } from '../lib/editorSession'
-import { SPRINGS, rubberClamp, trackSample, velocityFrom } from '../ui/physics.js'
+import { SPRINGS, rubberClamp, rubberCoefficient, rubberSlope, rubberUnclamp, trackSample, velocityFrom } from '../ui/physics.js'
 import { useSpring } from '../ui/useSpring.js'
 import { useDelayedFlag, useReveal, useRevealReady } from '../ui/revealState.js'
 import { MapSkeleton } from '../canvas/PaneSkeletons'
@@ -154,22 +154,45 @@ export default function EditorCanvas({
   const splitContainerRef = useRef(null)
   const [isResizingSplit, setIsResizingSplit] = useState(false)
   // The divider where it is drawn while a hand or a spring moves it: past its limits
-  // on a rubber band, then springing to where the ratio was kept. Null at rest.
-  const [drawnRatio, setDrawnRatio] = useState(null)
+  // on a rubber band, then springing to where the ratio was kept. Null at rest. Written
+  // straight to the split's grid every frame (paintSplit), never through React: a
+  // render of the whole canvas per frame would stall the divider under a slow one.
+  const drawnRef = useRef(null)
+  const paintSplit = (ratio) => {
+    const container = splitContainerRef.current
+    if (!container || splitView !== 'editor' || comparing) return
+    const tracks = `${ratio}fr var(--split-gutter) ${1 - ratio}fr`
+    if (splitOrientation === 'rows') container.style.gridTemplateRows = tracks
+    else container.style.gridTemplateColumns = tracks
+  }
   const divider = useSpring(splitRatio, {
     spring: SPRINGS.smooth,
     precision: 0.0005,
-    onChange: setDrawnRatio,
-    onRest: () => setDrawnRatio(null),
+    onChange: (ratio) => {
+      drawnRef.current = ratio
+      paintSplit(ratio)
+    },
+    onRest: (ratio) => {
+      drawnRef.current = null
+      paintSplit(ratio)
+    },
+  })
+  // A render while the divider is moving draws the kept ratio: put it back where it is
+  // drawn before the frame is painted.
+  useLayoutEffect(() => {
+    if (drawnRef.current !== null) paintSplit(drawnRef.current)
   })
   /** Spring the divider to `ratio` and keep it there, from wherever it is drawn. */
   const glideSplit = (ratio, velocity) => {
     const target = clampSplitRatio(ratio)
-    if (!divider.moving) divider.jump(drawnRatio ?? splitRatio)
+    if (!divider.moving) divider.jump(drawnRef.current ?? splitRatio)
     divider.set(target, velocity === undefined ? undefined : { velocity })
     setSplitRatio?.(target)
     // Already there: nothing to spring, so the kept ratio is drawn again.
-    if (!divider.moving) setDrawnRatio(null)
+    if (!divider.moving) {
+      drawnRef.current = null
+      paintSplit(target)
+    }
   }
   const [dragCaret, setDragCaret] = useState(null)
   // The pane's live view of notesByDoc. The hooks below run from editor events and
@@ -778,7 +801,7 @@ export default function EditorCanvas({
 
   // The divider is a track in the split grid, so the two panes are sized by the
   // ratio and the gutter never has to be accounted for twice.
-  const shownRatio = drawnRatio ?? splitRatio
+  const shownRatio = splitRatio
   const splitStyle = splitView === 'editor' && !comparing
     ? (splitOrientation === 'rows'
       ? {
@@ -803,31 +826,44 @@ export default function EditorCanvas({
     if (!container) return
 
     setIsResizingSplit(true)
+    const band = rubberCoefficient(event.pointerType)
+    const ratioAt = (pointer) => {
+      const rect = container.getBoundingClientRect()
+      return splitOrientation === 'rows'
+        ? (pointer.clientY - rect.top) / rect.height
+        : (pointer.clientX - rect.left) / rect.width
+    }
+    // Held where it was grabbed, and where it is drawn if caught mid-spring: the hand
+    // is wherever it would have to be for the divider to be drawn there.
+    const drawn = divider.moving ? divider.value : drawnRef.current ?? splitRatio
     divider.stop()
+    const offset = rubberUnclamp(drawn, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, SPLIT_GIVE, band) - ratioAt(event)
     const samples = []
+    let hand = null
 
     const onMove = (moveEvent) => {
-      const rect = container.getBoundingClientRect()
-      const ratio = splitOrientation === 'rows'
-        ? (moveEvent.clientY - rect.top) / rect.height
-        : (moveEvent.clientX - rect.left) / rect.width
-      trackSample(samples, { t: performance.now(), x: ratio })
-      divider.jump(rubberClamp(ratio, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, SPLIT_GIVE))
-      // Editor owns the clamp, so the ratio can never strand a pane off screen.
-      setSplitRatio?.(ratio)
+      hand = ratioAt(moveEvent) + offset
+      trackSample(samples, { t: moveEvent.timeStamp, x: hand })
+      // Drawn as it goes; the ratio is kept once, when it is let go (glideSplit).
+      divider.jump(rubberClamp(hand, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, SPLIT_GIVE, band))
     }
 
-    const onUp = () => {
+    const onUp = (upEvent) => {
       setIsResizingSplit(false)
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-      // Past a limit it springs back; the band gave only part of the hand's speed.
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      if (hand === null) return
+      // Past a limit it springs back, at the speed it was drawn moving: the hand's,
+      // slowed by the band. Inside them it stays where it was let go.
       const banded = divider.value !== clampSplitRatio(divider.value)
-      glideSplit(divider.value, banded ? velocityFrom(samples).x * 0.3 : 0)
+      const speed = banded && upEvent.type !== 'pointercancel' ? velocityFrom(samples, undefined, upEvent.timeStamp).x : 0
+      glideSplit(divider.value, speed * rubberSlope(hand, SPLIT_RATIO_MIN, SPLIT_RATIO_MAX, SPLIT_GIVE, band))
     }
 
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
   }
 
   // The divider from the keyboard: the arrows along it move it, Enter evens it out.
@@ -959,7 +995,7 @@ export default function EditorCanvas({
             aria-valuemax={100}
             tabIndex={0}
             title="Drag to resize · double-click to even out"
-            onMouseDown={startSplitResize}
+            onPointerDown={startSplitResize}
             onDoubleClick={() => glideSplit(0.5)}
             onKeyDown={nudgeSplit}
           >

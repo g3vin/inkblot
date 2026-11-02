@@ -19,6 +19,7 @@ import { useMemo, useRef, useState } from 'react'
 import { canvasSurfaceAt, dispatchCanvasDropTimelineEvent } from '../canvas/canvasEvents'
 import { formatDay } from '../lib/map/calendar'
 import { readLegDepart, setLegDepart } from '../lib/timeline/journeys'
+import { pastSlop } from '../ui/physics.js'
 import { eventById, isDated, moveEventBetween, setEventTime, updateEvent } from '../lib/timeline/timelineModel'
 import { cancelTimelinePreview, previewStoryTimeline } from '../lib/timeline/timelineStore'
 import { snapTo, snapUnit } from '../lib/timeline/timelineScale'
@@ -26,7 +27,6 @@ import { buildLanes, GUTTER, laneAt, lanesHeight, LANE_HEADER, NO_LANE, ROW_HEIG
 import { describeWhen } from './useTimelinePanel'
 import { inkColor } from '../lib/palette'
 
-const DRAG_THRESHOLD = 4
 
 function eventColor(event, timeline) {
   if (event.color) return inkColor(event.color)
@@ -119,7 +119,7 @@ export default function TimelineLanes({
     }
 
     const onMove = (move) => {
-      if (!moved && Math.hypot(move.clientX - origin.x, move.clientY - origin.y) < DRAG_THRESHOLD) return
+      if (!moved && !pastSlop(move.clientX - origin.x, move.clientY - origin.y, move.pointerType)) return
       moved = true
       const { fn, indicator, undating } = edit(move)
       lastEdit = fn

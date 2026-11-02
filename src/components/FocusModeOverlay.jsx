@@ -709,14 +709,29 @@ export default function FocusModeOverlay({ editor, onExit, leaving = false, onEx
       }
       return undefined
     }
+    const wasEntering = phaseRef.current === 'entering'
     phaseRef.current = 'leaving'
     setPhase('leaving')
     stopTween()
     window.clearTimeout(settleTimerRef.current)
     scrollingRef.current = false
     centredRef.current = null
-    cancelAnimations(overlay, true)
     const done = () => onExitedRef.current?.()
+    // Left before it had finished arriving: the zoom turns round where it is and goes
+    // back the way it came, rather than jumping to the middle to start from there.
+    const arriving = wasEntering && !prefersReducedMotion() && overlay?.getAnimations
+      ? overlay.getAnimations({ subtree: true }).filter((animation) => animation.playState === 'running')
+      : []
+    if (arriving.length) {
+      arriving.forEach((animation) => {
+        animation.effect?.updateTiming?.({ fill: 'both' })
+        animation.reverse()
+      })
+      let live = true
+      Promise.all(arriving.map((animation) => animation.finished)).then(() => { if (live) done() }, () => {})
+      return () => { live = false }
+    }
+    cancelAnimations(overlay, true)
     if (!overlay || !stage || !column || !backdrop || typeof stage.animate !== 'function' || !isEditorReady(editor)) {
       done()
       return undefined

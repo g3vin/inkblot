@@ -14,8 +14,8 @@
  * hand onto the row's new place, at the speed it was let go, and the row comes back
  * as it lands.
  */
-import { useCallback, useEffect } from 'react'
-import { SPRINGS, prefersReducedMotion, trackSample, velocityFrom } from '../ui/physics.js'
+import { useCallback, useEffect, useRef } from 'react'
+import { pastSlop, prefersReducedMotion, releaseSpring, trackSample, velocityFrom } from '../ui/physics.js'
 import { SpringValue } from '../ui/useSpring.js'
 import { moveEntry } from '../lib/entryOperations'
 import { canvasSurfaceAt, dispatchCanvasDropDoc } from '../canvas/canvasEvents'
@@ -29,7 +29,7 @@ const HOVER_EVENTS = ['mouseover', 'mouseout', 'mouseenter', 'mouseleave', 'poin
 /**
  * While a document is carried out of the tree, the page under it is only somewhere to
  * put it: nothing there opens on hover. Stopped at the window before anything else
- * sees them. The drag itself follows `mousemove`, which is left alone.
+ * sees them, except the drag's own listeners on the window, which still hear them.
  */
 function muteHovers() {
   const stop = (event) => {
@@ -218,10 +218,20 @@ export function useFileTreeDrag({
    * showing, the folder it went into), then take it away. Its left and top are
    * written straight to it: framer owns its transform, and React needn't know.
    */
+  // The ghost's landing under way: a new drag takes the ghost back from it.
+  const landingRef = useRef(null)
   const landGhost = (path, folder, velocity, done) => {
     const ghost = document.querySelector('.file-tree-drag-ghost')
+    const springs = []
+    let frame = 0
+    landingRef.current = () => {
+      cancelAnimationFrame(frame)
+      springs.forEach((spring) => spring.stop())
+      if (ghost) ghost.style.left = ghost.style.top = ''
+      landingRef.current = null
+    }
     // After the move has been drawn, so the row is in its new place.
-    requestAnimationFrame(() => {
+    frame = requestAnimationFrame(() => {
       const row = document.querySelector(`[data-entry-path="${CSS.escape(path)}"]`)
         ?? (folder ? document.querySelector(`[data-entry-path="${CSS.escape(folder)}"]`) : null)
       if (!ghost || !row || prefersReducedMotion()) {
@@ -230,10 +240,15 @@ export function useFileTreeDrag({
       }
       const from = ghost.getBoundingClientRect()
       let arrived = 0
-      const land = () => { arrived += 1; if (arrived === 2) done() }
+      const land = () => {
+        arrived += 1
+        if (arrived < 2) return
+        landingRef.current = null
+        done()
+      }
       const axis = (side, speed) => {
         const value = new SpringValue(from[side], {
-          spring: SPRINGS.momentum,
+          spring: releaseSpring(Math.hypot(velocity.x, velocity.y)),
           precision: 0.5,
           onChange: (current) => {
             ghost.style[side] = `${current}px`
@@ -243,6 +258,7 @@ export function useFileTreeDrag({
           },
           onRest: land,
         })
+        springs.push(value)
         value.set(row.getBoundingClientRect()[side], { velocity: speed })
         // Already there, it never sets off, so it never comes to rest either.
         if (!value.moving) land()
@@ -252,20 +268,21 @@ export function useFileTreeDrag({
     })
   }
 
-  // Mouse-driven drag & drop (not HTML5 DnD): a drag arms on item mousedown
-  // and activates after ~4px of movement, showing a ghost preview; mouseup
-  // commits the move.
+  // Pointer-driven drag & drop (not HTML5 DnD): a drag arms on a row's press and
+  // activates past the slop, showing a ghost preview; letting go commits the move, and
+  // a drag the system takes away (pointercancel) moves nothing. Heard at the window in
+  // the capture phase, beside muteHovers, which stops pointermove from going further.
   useEffect(() => {
     const onMove = (event) => {
       const drag = manualDragRef.current
       if (!drag) return
       dragPointRef.current = { x: event.clientX, y: event.clientY }
-      const dx = Math.abs(event.clientX - drag.startX)
-      const dy = Math.abs(event.clientY - drag.startY)
-      drag.samples = trackSample(drag.samples ?? [], { t: performance.now(), x: event.clientX, y: event.clientY })
+      drag.samples = trackSample(drag.samples ?? [], { t: event.timeStamp, x: event.clientX, y: event.clientY })
       if (!manualDragActiveRef.current) {
-        if (dx + dy < 4) return
+        if (!pastSlop(event.clientX - drag.startX, event.clientY - drag.startY, event.pointerType)) return
         manualDragActiveRef.current = true
+        // The last drop's ghost may still be landing: this drag has it now.
+        landingRef.current?.()
         drag.unmuteHovers = muteHovers()
         setIsDragging(true)
         setDragSourceId(`${drag.type}:${drag.path}`)
@@ -288,9 +305,11 @@ export function useFileTreeDrag({
       if (!drag.entries) updateSplitDrag(drag, event.clientX, event.clientY)
     }
 
-    const onUp = async () => {
+    const onUp = async (event) => {
       const drag = manualDragRef.current
       if (!drag) return
+      // Measured now, at the release, not after the move has been made.
+      const velocity = velocityFrom(drag.samples, undefined, event.timeStamp)
       const didDrag = manualDragActiveRef.current
       const insert = dragInsertRef.current
       const folder = dragOverFolderRef.current
@@ -305,12 +324,15 @@ export function useFileTreeDrag({
       setDragOverPath(null)
       setDragInsert(null)
       setDragOverFolder(null)
+      // Put the ghost away, unless another drag has picked it up since.
       const putDown = () => {
+        if (manualDragActiveRef.current) return
         setDragPreview(null)
         setDragSourceId(null)
       }
 
-      if (!didDrag) {
+      if (!didDrag || event.type === 'pointercancel') {
+        if (didDrag) splitDropTarget()?.clear()
         putDown()
         return
       }
@@ -353,14 +375,16 @@ export function useFileTreeDrag({
       const targetIndex = insert ? insert.index : undefined
       const placed = await performMoves(drag.entries ?? [{ path: drag.path, type: drag.type }], targetFolder, targetIndex)
       // Landed in a folder that is closed, the ghost goes into the folder's row.
-      landGhost(placed[0] ?? drag.path, targetFolder, velocityFrom(drag.samples), putDown)
+      landGhost(placed[0] ?? drag.path, targetFolder, velocity, putDown)
     }
 
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    window.addEventListener('pointermove', onMove, true)
+    window.addEventListener('pointerup', onUp, true)
+    window.addEventListener('pointercancel', onUp, true)
     return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('pointermove', onMove, true)
+      window.removeEventListener('pointerup', onUp, true)
+      window.removeEventListener('pointercancel', onUp, true)
     }
   }, [dragInsert, dragOverFolder, performMoves, updateManualDrag, updateSplitDrag, dragInsertRef, dragOverFolderRef, dragPointRef, manualDragActiveRef, manualDragRef, setDragInsert, setDragOverFolder, setDragOverPath, setDragPreview, setDragSourceId, setIsDragging])
 

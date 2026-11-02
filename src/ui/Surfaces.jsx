@@ -34,7 +34,7 @@ export function Panel({ open = true, side = 'right', width = 300, label, classNa
           style={{ width, ...style }}
           initial={reduce ? false : { opacity: 0, x: offset }}
           animate={{ opacity: 1, x: 0 }}
-          exit={reduce ? { opacity: 0 } : { opacity: 0, x: offset }}
+          exit={reduce ? { opacity: 0 } : { opacity: 0, x: offset, transition: toFramer(SPRINGS.exit) }}
           transition={toFramer(SPRINGS.smooth)}
         >
           {children}

@@ -71,9 +71,29 @@ const stripComments = (text, isCss) => (isCss
 const COLOR = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(/g
 const OLD_MOTION = /var\(--(?:dur-(?!shimmer)[a-z]+|ease-[a-z-]+)\)|cubic-bezier\(/
 const NOT_A_MOVE = /\binfinite\b|\blinear\b|steps\(|step-(?:start|end)|0\.01ms/
-const timedMotion = (value) => !NOT_A_MOVE.test(value) && (OLD_MOTION.test(value)
-  || (/(?:^|[\s,])ease(?:-in|-out|-in-out)?(?:[\s,]|$)/.test(value) && !/var\(--spring/.test(value))
-  || (/(?:^|[\s,(])(?!0m?s\b)\d+(?:\.\d+)?m?s\b/.test(value) && !/var\(--spring/.test(value)))
+/** A transition or animation's timings, one per comma that isn't inside brackets. */
+const timings = (value) => {
+  const parts = []
+  let depth = 0
+  let start = 0
+  for (let i = 0; i < value.length; i += 1) {
+    if (value[i] === '(') depth += 1
+    else if (value[i] === ')') depth -= 1
+    else if (value[i] === ',' && depth === 0) { parts.push(value.slice(start, i)); start = i + 1 }
+  }
+  return [...parts, value.slice(start)]
+}
+// Each timing on its own: a spring in one doesn't excuse a timed curve in another, nor
+// in a fallback inside the same var().
+const timedTiming = (part) => !NOT_A_MOVE.test(part) && (OLD_MOTION.test(part)
+  || /(?:^|[\s,(])ease(?:-in|-out|-in-out)?(?:[\s,)]|$)/.test(part)
+  || /(?:^|[\s,(])(?!0m?s\b)\d+(?:\.\d+)?m?s\b/.test(part
+    .replace(/var\(--spring-[a-z]+-dur\)/g, '')
+    // A stagger: a step times an item's place, as calc(var(--order) * 8ms). A delay, not a curve.
+    .replace(/calc\([^()]*var\([^()]*\)[^()]*\)/g, '')))
+const timedMotion = (value) => timings(value).some(timedTiming)
+/** A delay in a raw time: a stagger or a wait belongs in a token or a calc of one. */
+const RAW_DELAY_ALL = /(?:transition|animation)-delay\s*:\s*[^;{}]*?(?:^|[\s,(])(?!0m?s\b)\d+(?:\.\d+)?m?s\b/g
 
 function check(rel, text) {
   const isCss = rel.endsWith('.css')
@@ -98,11 +118,17 @@ function check(rel, text) {
       if (strings.some((s) => /^.#[0-9a-fA-F]{3,8}.$|^.#[0-9a-fA-F]{6}\b|(?:rgba?|hsla?)\(/.test(s))) at('color', line)
       // A timed curve in an inline style, a keyframe's timing or a framer transition.
       if (strings.some((s) => OLD_MOTION.test(s)) || /\bease:\s*['"[]/.test(line)) at('motion', line)
+      // Web Animations timed by hand: springTiming(SPRINGS.x) gives the spring's own.
+      if (/\.animate\(/.test(line) && /\bduration:\s*\d/.test(line)) at('motion', line)
     }
   })
   if (isCss) {
     // Whole declarations, as a transition often runs over several lines.
     const stripped = stripComments(text, true)
+    for (const match of stripped.matchAll(RAW_DELAY_ALL)) {
+      const line = stripped.slice(0, match.index).split('\n').length
+      findings.push({ kind: 'motion', line, detail: match[0].replace(/\s+/g, ' ').trim().slice(0, 100) })
+    }
     for (const match of stripped.matchAll(/(?:^|[\s;{])((?:transition|animation)(?:-duration|-timing-function)?\s*:\s*([^;{}]*))/g)) {
       if (!timedMotion(match[2].replace(/\s+/g, ' '))) continue
       const line = stripped.slice(0, match.index).split('\n').length + (match[0].startsWith('\n') ? 1 : 0)

@@ -18,10 +18,8 @@
  * (springLayout), so nothing jumps.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { trackSample, velocityFrom } from './physics.js'
+import { pastSlop, trackSample, velocityFrom } from './physics.js'
 import { springLayout } from './useSpring.js'
-
-const DRAG_THRESHOLD = 4
 
 /**
  * Where an item dropped at `point` goes among items with these rects (in order):
@@ -71,7 +69,14 @@ export default function usePointerReorder({ listRef, itemSelector = '[data-reord
     const index = inside ? insertionIndex(point, rects, axis) : null
     const next = { ...current, point, inside, insertIndex: index, started: true }
     dragRef.current = next
-    setDrag(next)
+    // The caller's ghost (.ui-reorder-ghost), if it draws one, is moved with the pointer
+    // by writing its position: the list re-renders only when where it would drop changes.
+    const ghost = current.started ? document.querySelector('.ui-reorder-ghost') : null
+    if (ghost) {
+      ghost.style.left = `${point.x - next.grab.x}px`
+      ghost.style.top = `${point.y - next.grab.y}px`
+    }
+    if (!current.started || current.inside !== inside || current.insertIndex !== index) setDrag(next)
     handlers.current.onMove?.(next)
   }, [axis, measure, slop])
 
@@ -83,16 +88,20 @@ export default function usePointerReorder({ listRef, itemSelector = '[data-reord
   const onPointerDown = useCallback((event, id, { external = false, payload } = {}) => {
     if (disabled || event.button !== 0) return
     const origin = { x: event.clientX, y: event.clientY }
-    dragRef.current = { id, external, payload, origin, point: origin, started: false, inside: !external, insertIndex: null }
-    const samples = [{ t: performance.now(), ...origin }]
+    // Held where it was grabbed: the ghost's middle stays this far from the pointer.
+    const item = event.target?.closest?.(itemSelector) ?? event.currentTarget
+    const box = item?.getBoundingClientRect?.()
+    const grab = box ? { x: origin.x - (box.left + box.width / 2), y: origin.y - (box.top + box.height / 2) } : { x: 0, y: 0 }
+    dragRef.current = { id, external, payload, origin, grab, point: origin, started: false, inside: !external, insertIndex: null }
+    const samples = [{ t: event.timeStamp, ...origin }]
 
     const move = (e) => {
       const point = { x: e.clientX, y: e.clientY }
       const current = dragRef.current
       if (!current) return
-      if (!current.started && Math.hypot(point.x - origin.x, point.y - origin.y) < DRAG_THRESHOLD) return
+      if (!current.started && !pastSlop(point.x - origin.x, point.y - origin.y, e.pointerType)) return
       e.preventDefault()
-      trackSample(samples, { t: performance.now(), ...point })
+      trackSample(samples, { t: e.timeStamp, ...point })
       update(point)
     }
     const end = (e) => {
@@ -117,8 +126,11 @@ export default function usePointerReorder({ listRef, itemSelector = '[data-reord
         index: inside ? insertionIndex(point, rects, axis) : null,
         point,
       })
-      // After the caller's reorder has been drawn.
-      if (inside) requestAnimationFrame(() => settle({ id: current.id, from: point, velocity: velocityFrom(samples) }))
+      // After the caller's reorder has been drawn: from where the ghost was, at the speed
+      // it was let go.
+      const velocity = velocityFrom(samples, undefined, e.timeStamp)
+      const from = { x: point.x - current.grab.x, y: point.y - current.grab.y }
+      if (inside) requestAnimationFrame(() => settle({ id: current.id, from, velocity }))
     }
     const cancel = () => {
       window.removeEventListener('pointermove', move, true)
@@ -136,7 +148,8 @@ export default function usePointerReorder({ listRef, itemSelector = '[data-reord
 
   return {
     dragging: drag?.started ? drag.id : null,
-    ghost: drag?.started ? drag.point : null,
+    /** Where the ghost's middle goes: under the pointer, as far from it as it was grabbed. */
+    ghost: drag?.started ? { x: drag.point.x - drag.grab.x, y: drag.point.y - drag.grab.y } : null,
     insertIndex: drag?.started ? drag.insertIndex : null,
     inside: drag?.started ? drag.inside : false,
     external: drag?.external ?? false,

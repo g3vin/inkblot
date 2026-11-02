@@ -25,7 +25,7 @@ import '../Toolbar.css'
 import './Toolbar.customize.css'
 import { FLEXIBLE_SPACE, PAGE, SPACE, isSpacer, toolbarItem } from '../../lib/chromeLayout'
 import { useCommands } from '../../lib/commands'
-import useSpaceSwipe from '../../hooks/useSpaceSwipe'
+import useSpaceSwipe, { useSwipeProgress } from '../../hooks/useSpaceSwipe'
 import { CUSTOMIZE_TOOLBAR_EVENT, useToolbarContext } from './toolbarContext'
 import ToolbarItem from './ToolbarItem'
 import usePointerReorder from '../../ui/usePointerReorder'
@@ -293,16 +293,19 @@ export default function ToolbarHost({ context, editor, activeDoc, hasProject, pa
   // The pill rides the swipe's own spring (useSpaceSwipe paints it every frame, so
   // nothing else eases it). The page only leans the fingers' way while they swipe, and
   // fades as far as they've gone; it glides to the page that turns from wherever it leant.
-  const travel = swipe.dragging ? clamp(swipe.progress - current, -1, 1) : 0
+  const progress = useSwipeProgress(swipe)
+  const travel = swipe.dragging ? clamp(progress - current, -1, 1) : 0
   const lean = travel * -SWIPE_LEAN_PX
   const trackStyle = {
     '--tb-swipe-fade': 1 - (1 - SWIPE_FADE_FLOOR) * Math.abs(travel),
     '--tb-swipe-floor': SWIPE_FADE_FLOOR,
     width: `${count * 100}%`,
     transform: `translateX(calc(-${(current * 100) / count}% + ${lean}px))`,
-    transition: swipe.dragging || reducedMotion ? 'none' : 'transform var(--spring-momentum-dur) var(--spring-momentum)',
+    // The swipe's own landing: the fingers' speed in it when let go, the quick spring
+    // from rest for a click or a key.
+    transition: swipe.dragging || reducedMotion ? 'none' : `transform ${swipe.snap}`,
   }
-  const pillStyle = { '--tb-page-progress': clamp(swipe.progress, -0.3, count - 0.7) }
+  const pillStyle = { '--tb-page-progress': clamp(progress, -0.3, count - 0.7) }
 
   return (
     <ToolbarDockContext.Provider value={dock}>

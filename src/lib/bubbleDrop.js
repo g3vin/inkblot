@@ -175,7 +175,8 @@ export const insertion = (geometry, x, y) => {
   }
 }
 
-export const velocityOf = (samples) => velocityFrom(samples)
+/** A drag's speed at `at`, the release (the last move by default). */
+export const velocityOf = (samples, at = samples[samples.length - 1]?.t) => velocityFrom(samples, undefined, at)
 
 /* ---------------- throwing ---------------- */
 

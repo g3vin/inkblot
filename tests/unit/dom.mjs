@@ -38,6 +38,12 @@ import { ok } from './assert.mjs'
 // Two frames and then some: the canvas syncs its zoom to React on one, and the
 // bridge coalesces what it publishes to the next.
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 80)) })
+// A zoom command springs the view there; the readout follows once it has landed and
+// the toolbar has been told, a tick later.
+const settleGlide = async () => {
+  await act(async () => { await new Promise((r) => setTimeout(r, 700)) })
+  await settle()
+}
 // A wheel gesture is committed once it has been still for 120ms (useCanvasViewport),
 // and what that commits is published on the frame after.
 const settleGesture = async () => {
@@ -95,13 +101,13 @@ ok('the zoom readout starts at 100%', readout() === '100%')
 await act(async () => {
   button('Zoom in').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
 })
-await settle()
+await settleGlide()
 ok('zoom in updates the readout under StrictMode', readout() === '120%')
 
 await act(async () => {
   button('Zoom out').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
 })
-await settle()
+await settleGlide()
 ok('zoom out updates the readout', readout() === '100%')
 
 // ⌘/pinch-scroll: the path a user actually reaches for.
@@ -125,7 +131,7 @@ ok('a plain wheel pans without changing zoom', readout() === zoomed)
 await act(async () => {
   button('Zoom in').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }))
 })
-await settle()
+await settleGlide()
 ok('the readout still responds after many frames', readout() !== zoomed)
 
 /* ---- the DOM the rest of the canvas depends on ---- */

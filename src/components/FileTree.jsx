@@ -788,6 +788,44 @@ export default function FileTree({
     const isCarried = !isDragSource && Boolean(dragPreview?.ids?.includes(nodeId))
     const arrived = arrivedPath !== null && (node.path === arrivedPath || node.path.startsWith(`${arrivedPath}/`))
 
+    // A press on the row: it takes the keys, and arms a drag of the row (or of the
+    // selection it is part of) that starts once the pointer has moved past the slop.
+    const pressRow = (e) => {
+      if (e.target instanceof HTMLElement && e.target.closest('input, textarea, button')) {
+        return
+      }
+      e.preventDefault()
+      // Held down here, the list takes the keys (⌘A, ⌘⌫) as a focused list would.
+      listRef.current?.setAttribute('data-pointer-focus', '')
+      listRef.current?.focus({ preventScroll: true })
+      // A filtered tree hides siblings, so there is nowhere certain to drop.
+      if (e.button !== 0 || filtering) return
+      // A row grabbed out of a selection carries the selection with it.
+      const carried = multi && selection.has(nodeId) && !(e.metaKey || e.ctrlKey || e.shiftKey) ? selectedEntries() : null
+      // The ghost is the row itself, lifted: its size, and held where it was grabbed.
+      const rowRect = e.currentTarget.getBoundingClientRect()
+      manualDragRef.current = {
+        path: node.path,
+        type: node.type,
+        name: dragName,
+        iconName,
+        iconFilled,
+        startX: e.clientX,
+        startY: e.clientY,
+        box: {
+          width: rowRect.width,
+          height: rowRect.height,
+          grabX: e.clientX - rowRect.left,
+          grabY: e.clientY - rowRect.top,
+          paddingLeft: getComputedStyle(e.currentTarget).paddingLeft,
+        },
+        entries: carried?.length > 1 ? carried : null,
+      }
+      manualDragActiveRef.current = false
+      dragInsertRef.current = null
+      dragOverFolderRef.current = null
+    }
+
     return (
       <MotionDiv
         key={nodeId}
@@ -814,41 +852,10 @@ export default function FileTree({
           data-entry-index={siblingIndex}
           animate={prefersReducedMotion ? undefined : isDragSource || isCarried ? { opacity: 0.24, scale: 0.985 } : { opacity: 1, scale: 1 }}
           transition={toFramer(SPRINGS.quick)}
-          onMouseDown={(e) => {
-            if (e.target instanceof HTMLElement && e.target.closest('input, textarea, button')) {
-              return
-            }
-            e.preventDefault()
-            // Held down here, the list takes the keys (⌘A, ⌘⌫) as a focused list would.
-            listRef.current?.setAttribute('data-pointer-focus', '')
-            listRef.current?.focus({ preventScroll: true })
-            // A filtered tree hides siblings, so there is nowhere certain to drop.
-            if (e.button !== 0 || filtering) return
-            // A row grabbed out of a selection carries the selection with it.
-            const carried = multi && selection.has(nodeId) && !(e.metaKey || e.ctrlKey || e.shiftKey) ? selectedEntries() : null
-            // The ghost is the row itself, lifted: its size, and held where it was grabbed.
-            const rowRect = e.currentTarget.getBoundingClientRect()
-            manualDragRef.current = {
-              path: node.path,
-              type: node.type,
-              name: dragName,
-              iconName,
-              iconFilled,
-              startX: e.clientX,
-              startY: e.clientY,
-              box: {
-                width: rowRect.width,
-                height: rowRect.height,
-                grabX: e.clientX - rowRect.left,
-                grabY: e.clientY - rowRect.top,
-                paddingLeft: getComputedStyle(e.currentTarget).paddingLeft,
-              },
-              entries: carried?.length > 1 ? carried : null,
-            }
-            manualDragActiveRef.current = false
-            dragInsertRef.current = null
-            dragOverFolderRef.current = null
-          }}
+          onMouseDown={(e) => pressRow(e)}
+          // A pen or a finger arms the same drag; a mouse arms it on mousedown, whose
+          // default (starting a text selection) preventDefault reliably stops.
+          onPointerDown={(e) => { if (e.pointerType !== 'mouse') pressRow(e) }}
           onClick={(e) => {
             if (e.target instanceof HTMLElement && e.target.closest('input, textarea, button')) {
               return

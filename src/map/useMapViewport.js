@@ -28,7 +28,6 @@ import {
   svgWorldTransform,
   zoomMapAt,
 } from '../lib/map/mapViewport'
-import { trackSample, velocityFrom } from '../ui/physics.js'
 import { coast } from '../ui/useSpring.js'
 
 const WHEEL_ZOOM_SENSITIVITY = 0.01
@@ -201,34 +200,16 @@ export function useMapViewport({ initialViewport, onViewportChange, enabled = tr
 
   /* ---------------- dragging the map ---------------- */
 
-  /** Begin a pan from a pointerdown; returns a function that ends it early. */
-  const startPan = useCallback(
-    (event) => {
+  /** Catch the map if it is coasting: any press on it does (useMapInput). */
+  const stopCoast = useCallback(() => stopCoastRef.current(), [])
+
+  /** Let a pan go at `velocity` ({ x, y } px/ms): the map coasts on under friction. */
+  const throwPan = useCallback(
+    (velocity) => {
       stopCoastRef.current()
-      let lastX = event.clientX
-      let lastY = event.clientY
-      const samples = [{ t: performance.now(), x: lastX, y: lastY }]
-      const onMove = (moveEvent) => {
-        applyViewport(panMapBy(viewportRef.current, moveEvent.clientX - lastX, moveEvent.clientY - lastY))
-        lastX = moveEvent.clientX
-        lastY = moveEvent.clientY
-        trackSample(samples, { t: performance.now(), x: lastX, y: lastY })
-      }
-      const stop = (upEvent) => {
-        window.removeEventListener('pointermove', onMove)
-        window.removeEventListener('pointerup', stop)
-        window.removeEventListener('pointercancel', stop)
-        // Let go while moving, the map coasts on: the throw's speed under friction.
-        if (upEvent?.type === 'pointerup') {
-          stopCoastRef.current = coast(velocityFrom(samples), (dx, dy) => {
-            applyViewport(panMapBy(viewportRef.current, dx, dy))
-          })
-        }
-      }
-      window.addEventListener('pointermove', onMove)
-      window.addEventListener('pointerup', stop)
-      window.addEventListener('pointercancel', stop)
-      return stop
+      stopCoastRef.current = coast(velocity, (dx, dy) => {
+        applyViewport(panMapBy(viewportRef.current, dx, dy))
+      })
     },
     [applyViewport]
   )
@@ -291,10 +272,11 @@ export function useMapViewport({ initialViewport, onViewportChange, enabled = tr
     applyViewport,
     screenToWorldAt,
     toSurfacePoint,
-    startPan,
+    stopCoast,
+    throwPan,
     zoomIn,
     zoomOut,
     fitTo,
     centerOn,
-  }), [viewport, settledZoom, applyViewport, screenToWorldAt, toSurfacePoint, startPan, zoomIn, zoomOut, fitTo, centerOn])
+  }), [viewport, settledZoom, applyViewport, screenToWorldAt, toSurfacePoint, stopCoast, throwPan, zoomIn, zoomOut, fitTo, centerOn])
 }

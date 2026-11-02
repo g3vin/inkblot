@@ -24,13 +24,14 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Icon from './Icon.jsx'
+import { SPRINGS, springEasing } from './physics.js'
 import { TOOL_DEAD_ZONE, TOOL_DISC, TOOL_HIT, hitSlot, pickSlot, placeRing, slotOffset, stepSlot, toolRingRadius } from './inkWheelGeometry.js'
 import './ToolWheel.css'
 
 // Resting on a tool with options this long opens them.
 const DWELL_MS = 350
-// Match --spring-exit-dur in ToolWheel.css: the ring folds away before it unmounts.
-const CLOSE_MS = 192
+// The ring folds away on --spring-exit (ToolWheel.css) before it unmounts: its settle time.
+const CLOSE_MS = springEasing(SPRINGS.exit).duration
 // Room under the ring for the targeted tool's name.
 const NAME_ROOM = 32
 

@@ -32,6 +32,7 @@
  * written back, so it is put in its own document's archive instead.
  */
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { pastSlop } from '../../ui/physics.js'
 import { createPortal } from 'react-dom'
 import { LayoutGroup, MotionConfig } from 'framer-motion'
 import {
@@ -80,7 +81,6 @@ import BubbleTopControls from './BubbleTopControls'
 import useBubbleGestures from './useBubbleGestures'
 import './BubbleEditor.css'
 
-const DRAG_THRESHOLD = 4
 const HISTORY_LIMIT = 100
 
 /* ---------------- state ---------------- */
@@ -267,7 +267,7 @@ export default function BubbleEditor({ session, onClose, toolbarSlot = null, det
       const x = moveEvent.clientX
       const y = moveEvent.clientY
       if (!gesture.started) {
-        if (Math.hypot(x - gesture.startX, y - gesture.startY) < DRAG_THRESHOLD) return
+        if (!pastSlop(x - gesture.startX, y - gesture.startY, moveEvent.pointerType)) return
         gesture.started = true
         gesture.geometry = measure(gesture.id)
         setSelectedId(null)
@@ -305,7 +305,7 @@ export default function BubbleEditor({ session, onClose, toolbarSlot = null, det
       // A throw: released moving, and heading for the shelf. It lands where it was going.
       if (target.kind !== 'trash' && target.kind !== 'join') {
         const { stage } = gesture.geometry
-        const landing = throwLanding(stage, { x, y }, velocityOf(gesture.samples))
+        const landing = throwLanding(stage, { x, y }, velocityOf(gesture.samples, upEvent.timeStamp))
         if (landing) target = { kind: 'aside', ...shelfPoint(stage, landing.x, gesture) }
       }
       setDrag(null)
@@ -561,10 +561,11 @@ export default function BubbleEditor({ session, onClose, toolbarSlot = null, det
     )
   }
 
-  // Following the fingers while a swipe is under way; springing back if it stops short.
+  // Following the fingers while a swipe is under way; springing back if it stops short,
+  // which is a return, not a throw, so it doesn't overshoot.
   const slide = swipe.offset
     ? { transform: `translateX(${swipe.offset}px)`, transition: 'none' }
-    : { transition: 'transform var(--spring-momentum-dur) var(--spring-momentum)' }
+    : { transition: 'transform var(--spring-smooth-dur) var(--spring-smooth)' }
   const shown = displayTexts(words, session?.original)
   const rowItems = words.map((word, index) => renderBubble(word, 'row', shown[index]))
   if (editing?.draft) {
