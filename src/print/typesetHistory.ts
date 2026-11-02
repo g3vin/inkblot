@@ -45,8 +45,11 @@ export interface TypesetEntry {
 /** The book's own, not its setting: never restored with a typeset. */
 const NOT_TYPESET = new Set(['folder', 'title', 'author', 'language'])
 
-/** Automatic entries a book keeps; named ones and exports are kept however many. */
-const AUTO_CAP = 60
+/**
+ * Automatic entries a book keeps; named ones and exports are kept however many.
+ * @public The typeset suite reads it through a dynamic import, which knip can't follow.
+ */
+export const AUTO_CAP = 60
 
 /** A chapter's typesetting, from its content. */
 export const chapterTypesetOf = (content: PMJSON | null | undefined): ChapterTypeset => {
