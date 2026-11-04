@@ -199,14 +199,43 @@ pub struct CanvasToolbarState {
 }
 
 /// The page's own view settings that a shell offers as toolbar toggles, pushed whole
-/// whenever either changes and once at startup. The page still owns both: the shell
-/// asks with `setFocusMode` / `setWordCountVisible` and lights its buttons from this.
+/// whenever any changes and once at startup. The page still owns them: the shell asks
+/// with `setFocusMode` / `setWordCountVisible` / `setMarkVisible` and lights its
+/// buttons from this.
 #[typeshare]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ViewOptions {
     pub focus_mode: bool,
     pub word_count_visible: bool,
+    pub marks: MarkVisibility,
+}
+
+/// Which of the marks the page draws over the writer's text are shown. None of them
+/// is content: hiding one changes nothing that is saved or printed.
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarkVisibility {
+    /// Characters, places and other story entries named in the text.
+    pub names: bool,
+    /// Note dots, and the tint on the text a note is about.
+    pub notes: bool,
+    /// Bubble session chips.
+    pub bubbles: bool,
+    /// Timeline passages: their tint and their event chips.
+    pub timeline: bool,
+}
+
+impl Default for MarkVisibility {
+    fn default() -> Self {
+        Self {
+            names: true,
+            notes: true,
+            bubbles: true,
+            timeline: true,
+        }
+    }
 }
 
 /// The readable text of the document and the words resolved out of it.

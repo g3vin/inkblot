@@ -1,0 +1,43 @@
+/* A name tag's card (EntityPreview.jsx): a card in the entry's ink, over the page. */
+
+.entity-preview {
+  position: fixed;
+  z-index: var(--z-tooltip);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 280px;
+  max-width: calc(100vw - 2 * var(--space-3));
+  box-shadow: var(--shadow-float);
+  font-family: var(--font-ui);
+  animation: entity-preview-in var(--spring-smooth-dur) var(--spring-smooth) both;
+}
+
+.entity-preview p { margin: 0; }
+.entity-preview-name { color: var(--text-primary); }
+
+.entity-preview-excerpt {
+  color: var(--text-secondary);
+  font-family: var(--font-editor);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.entity-preview-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+@keyframes entity-preview-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entity-preview { animation: none; }
+}

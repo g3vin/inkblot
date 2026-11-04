@@ -456,6 +456,28 @@ and `.ib-prose` (any element that shows the writer's text).
   split for real, the new document dimmed under the outline until the pointer lets go
   (that is what keeps it), and moving on puts it back with the document under the pointer again,
   as a clipboard piece settles into the page and lifts out.
+- **Marks over the text.** What the page draws over the writer's words without being
+  part of them: name tags, note dots, bubble chips and timeline passages. None is saved,
+  printed or copied, and the toolbar's **Show** menu (`inkblot.view.marks`, eye; eye
+  slashed while anything is hidden) turns each off, with Hide all / Show all and a ⌘K
+  command per layer (`lib/markVisibility.ts`). A hidden layer is named in
+  `data-hide-marks` on the root, and its CSS hides the whole margin hang, so the words
+  close up (`EditorMarks.css`). Footnote marks and citations are content, not marks: they
+  stay. **A name tag** is a dotted underline in its folder's ink (characters violet,
+  places teal, outline slate, a writer's own type its own ink), with no fill, so a page
+  full of names stays quiet. A plain click edits the name; ⌘-click opens the entry
+  (Ctrl-click off macOS), ⌥⌘-click opens it beside; with ⌘ held the underline turns
+  solid and the pointer says it's a link. Its tooltip says so ("⌘-click to open Kira").
+  Canvas cards carry the same tags, live or static (`canvas/cardTags.js`). Resting on a
+  tag shows **its card** (`EntityPreview`): a `Card` in the entry's ink, under the tag,
+  with the kind as its eyebrow (Character, Setting), the name, its other names, the
+  opening lines of its document in `--font-editor`, and an Open button. It waits a
+  moment before showing, never takes focus, and stays while the pointer crosses onto it.
+  A name that is also an ordinary word is not tagged where it reads as one ("Will you
+  come?"); the Details panel's **Always tag** overrides that. A note's characters are
+  `Tag`s in the same inks on its card; a missing one reads "(missing)". The Notes panel's
+  scope menu ("All notes ▾") shows one character's notes, and appears only when the
+  notes name someone.
 - **Modes that take the card over.** Focus mode keeps the card on the tray, inset
   `--space-3` all round, and puts both sidebars away as it opens (they hover in from
   the edges as ever, and come back docked when it closes). Its controls are the

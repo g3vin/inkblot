@@ -55,6 +55,8 @@ round-tripped through JSON (`src/bridge/transport.ts`).
 | Entry operations | Rename, move and delete, closing what they touch first | `src/lib/entryOperations.ts` |
 | Preferences | Hydrated before the first render, read synchronously after | `src/lib/preferences.ts` |
 | Commands | The ⌘K registry every action joins | `src/lib/commands.ts` |
+| Story entries | Every document under a preset folder (characters, places, a writer's own types) with its aliases; name tags find them in the text, in documents and on canvas cards, judging a name that is also a word by its sentence (compromise, loaded on first need) | `src/lib/storyEntries.ts`, `src/lib/nameContext.ts`, `src/extensions/EntityMentions.js`, `src/canvas/cardTags.js` |
+| Name tag behaviour | ⌘-click to open (a canvas answers for its cards, a pane through the bridge), the hover card | `src/lib/entityLinks.js`, `src/components/EntityPreview.jsx` |
 | Reducers | Canvas and map state, with undo as snapshots | `src/canvas/canvasReducer.ts`, `src/map/mapReducer.ts` |
 | Timeline store | The project's one chronology, with previews and undo | `src/lib/timeline/timelineStore.js` |
 | `ProjectStore` | Rust persistence: projects, documents, versions, locations | `inkblot-core/src/store/` (one file per concern) |
@@ -139,6 +141,12 @@ round-tripped through JSON (`src/bridge/transport.ts`).
   afterwards (`src/lib/preferences.ts`). Per-launch values (the project-open id, the
   Pinterest refresh flag) stay in memory. File-tree order and expansion are
   machine-local, so they are never written into the project.
+- **Document fields** (`documentFields.ts`): a story entry's aliases and a document's
+  point of view, in `.story/fields.json` keyed by tree path, not in each document (a
+  canvas must stay JSON Canvas, and both savers write only the keys they know). Renames,
+  moves and deletes rewrite it (`observeEntries`). A note's characters are on the note
+  (`characters`, tree paths, in both normalizers), and `noteCharacterLinks.js` follows a
+  renamed character into every document's notes.
 - **Every offset is a UTF-16 code unit**: ProseMirror positions, JS string indices,
   and every offset on the bridge. A Rust byte or `char` offset is neither. Convert
   with `inkblot_core::js_string`.

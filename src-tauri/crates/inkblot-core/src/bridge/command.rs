@@ -484,6 +484,26 @@ pub struct SetWordCountVisibleCommand {
     pub visible: bool,
 }
 
+/// One layer of the marks the page draws over the text (`MarkVisibility`).
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MarkLayer {
+    Names,
+    Notes,
+    Bubbles,
+    Timeline,
+}
+
+/// Show or hide one kind of mark.
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetMarkVisibleCommand {
+    pub mark: MarkLayer,
+    pub visible: bool,
+}
+
 /// Everything the shell can ask the document surface to do.
 ///
 /// Adjacently tagged (`{ "type": …, "payload": … }`) because that is the one enum
@@ -556,6 +576,7 @@ pub enum NativeCommand {
     EditorHistory(EditorHistoryCommand),
     SetFocusMode(SetFocusModeCommand),
     SetWordCountVisible(SetWordCountVisibleCommand),
+    SetMarkVisible(SetMarkVisibleCommand),
     /* References (`references.rs`). */
     AddReference(AddReferenceCommand),
     CreateReference(CreateReferenceCommand),

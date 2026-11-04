@@ -1,0 +1,48 @@
+/*
+ * EditorMarks.css — the marks drawn over the writer's text that are not content: the
+ * name tags (EntityMentions), and the Show menu's hiding of the others.
+ *
+ * A hidden layer is named in `data-hide-marks` on the root element
+ * (lib/markVisibility.ts). The note card's own highlight (`.note-range.is-active`), and
+ * the timeline's passages in the lens and their drag handles, stay: each answers
+ * something the writer just opened.
+ */
+
+/* ---------------- name tags ---------------- */
+
+.entity-mention {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.2em;
+  text-decoration-color: var(--entity-ink, var(--accent-color));
+}
+
+/* With ⌘ held, a tag is a link: solid, and the pointer says so. */
+.ProseMirror.is-entity-linking .entity-mention:hover {
+  text-decoration-style: solid;
+  cursor: pointer;
+}
+
+/* ---------------- hidden layers ---------------- */
+
+/* The whole margin hang (lib/marginHang.js), not just its indicator: the hang keeps the
+   indicator's width, and the words close up only when it goes too. */
+:root[data-hide-marks~='notes'] .margin-hang:has(> .note-marker),
+:root[data-hide-marks~='notes'] .note-marker {
+  display: none;
+}
+
+:root[data-hide-marks~='bubbles'] .margin-hang:has(> .bubble-session-chip),
+:root[data-hide-marks~='bubbles'] .bubble-session-chip {
+  display: none;
+}
+
+:root[data-hide-marks~='timeline'] .timeline-range-chip {
+  display: none;
+}
+
+:root[data-hide-marks~='timeline'] .timeline-range:not(.is-in-lens) {
+  background: none;
+  border-bottom-color: transparent;
+}

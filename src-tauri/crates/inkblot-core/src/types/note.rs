@@ -116,6 +116,8 @@ pub struct Note {
     pub preview_size: NotePreviewSize,
     pub images: Vec<NoteImage>,
     pub audio: Vec<AudioClip>,
+    /// Tree paths of the story entries (characters, mostly) the note is about.
+    pub characters: Vec<String>,
     pub created_at: String,
     pub updated_at: String,
     /// A *derived, display-only* short local time ("5:32 PM") that `normalizeNote`

@@ -16,7 +16,21 @@ import { allFolderPresets, openFolderPresets } from '../../lib/folderPresets'
 import { openDocumentWindow } from '../../lib/docWindow'
 import { lockReason, setDocumentLocked, setFolderLocked } from '../../lib/docLocks'
 import { isEntryEmpty } from '../../lib/emptiness'
+import { documentFields, setDocumentField } from '../../lib/documentFields'
+import { getStoryEntries } from '../../lib/storyEntries'
 import { FILETREE_FOLDERS_VISIBILITY, FILETREE_NEW_ENTRY, FILETREE_NEW_PROJECT, FILETREE_REFRESH_PROJECTS, FILETREE_SELECTION } from '../../lib/appEvents'
+
+/** "Point of view": the project's characters, the document's own ticked (documentFields.ts). */
+async function buildPointOfViewSubmenu(docPath) {
+  const { CheckMenuItem, Submenu } = await import('@tauri-apps/api/menu')
+  const pov = documentFields(docPath).pov || null
+  const characters = getStoryEntries().filter((entry) => entry.isCharacter && entry.path !== docPath)
+  const choice = (text, path) => CheckMenuItem.new({ text, checked: pov === path, action: () => void setDocumentField(docPath, 'pov', path) })
+  const items = characters.length
+    ? [await choice('None', null), ...(await Promise.all(characters.map((entry) => choice(entry.name, entry.path))))]
+    : [await CheckMenuItem.new({ text: 'No characters yet', checked: false, enabled: false })]
+  return Submenu.new({ text: 'Point of view', items })
+}
 
 export async function fileTreeMenu(ctx) {
   const {
@@ -207,6 +221,7 @@ export async function fileTreeMenu(ctx) {
         }),
         await buildMoveToSubmenu(entryPath),
         await lockItem(),
+        await buildPointOfViewSubmenu(entryPath),
         await PredefinedMenuItem.new({ item: 'Separator' }),
 
         await buildCopyPathSubmenu(entryPath),

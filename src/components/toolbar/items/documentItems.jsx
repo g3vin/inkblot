@@ -7,6 +7,7 @@
  * the live editor (see DictationControl, ReadAloudControl).
  */
 import { runCommand } from '../../../lib/commands'
+import { MARK_LAYERS } from '../../../lib/markVisibility'
 import { useEffect, useState } from 'react'
 import DictationControl from '../../DictationControl'
 import ReadAloudControl from '../../ReadAloudControl'
@@ -321,6 +322,34 @@ export function WordCountItem({ ctx, spec }) {
   return (
     <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
       <ToolButton icon="number" label={spec.label} title={on ? 'Hide the word count' : 'Show the word count'} display={ctx.display} active={on} onClick={() => ctx.send('setWordCountVisible', { visible: !on })} />
+    </ItemFrame>
+  )
+}
+
+/** The Show menu: which marks are drawn over the text (lib/markVisibility.ts). */
+export function MarksItem({ ctx, spec }) {
+  const marks = ctx.view.marks || {}
+  const shown = (id) => marks[id] !== false
+  const allShown = MARK_LAYERS.every(({ id }) => shown(id))
+  return (
+    <ItemFrame id={spec.id} label={spec.label} display={ctx.display}>
+      <MenuButton
+        icon={allShown ? 'show' : 'hide'}
+        label={spec.label}
+        display={ctx.display}
+        items={() => [
+          ...MARK_LAYERS.map(({ id, label }) => ({
+            text: label,
+            checked: shown(id),
+            action: () => ctx.send('setMarkVisible', { mark: id, visible: !shown(id) }),
+          })),
+          { separator: true },
+          {
+            text: allShown ? 'Hide all' : 'Show all',
+            action: () => MARK_LAYERS.forEach(({ id }) => ctx.send('setMarkVisible', { mark: id, visible: !allShown })),
+          },
+        ]}
+      />
     </ItemFrame>
   )
 }

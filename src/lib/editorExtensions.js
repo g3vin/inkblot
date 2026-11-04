@@ -25,6 +25,7 @@ import { NoteAnnotation } from '../extensions/NoteAnnotation'
 import { DocumentLock } from '../extensions/DocumentLock'
 import { DropPreview } from '../extensions/DropPreview'
 import { HiddenText } from '../extensions/HiddenText'
+import { EntityMentions } from '../extensions/EntityMentions'
 import { TimelineAnchors } from '../extensions/TimelineAnchors'
 import PinterestBoard from '../extensions/PinterestBoard'
 import { ReadAloudHighlight } from '../extensions/ReadAloudHighlight'
@@ -95,6 +96,8 @@ export const buildEditorExtensions = (starterKit) => [
   }),
   NoteAnnotation,
   TimelineAnchors,
+  // Characters, places and other story entries named in the text.
+  EntityMentions,
   DocumentLock,
   ConversationTile,
   PinterestBoard,
@@ -143,6 +146,8 @@ export const buildCardExtensions = () => [
     bulletList: { keepMarks: true },
     orderedList: { keepMarks: true },
   }),
+  // Name tags while the card is edited; a static card writes its own (canvas/cardTags.js).
+  EntityMentions,
   ...sharedExtensions(),
 ]
 

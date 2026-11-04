@@ -65,12 +65,12 @@ pub use command::{
     CanvasRestoreCommand, CanvasRevealCommand, CreateEntryCommand, DeleteEntryCommand,
     DictationCancelCommand, DictationLevelCommand, DictationTranscript, DuplicateEntryCommand,
     EditorHistoryCommand, EntryKind, InsertPlainTextCommand, InsertTableCommand,
-    JumpToAnchorCommand, MoveEntryCommand, NativeCommand, OpenDocumentCommand, OpenProjectCommand,
-    RenameEntryCommand, ReplaceRangesCommand, SetAlignmentCommand, SetBlockTypeCommand,
-    SetCaretAtDocPosCommand, SetColorCommand, SetContentCommand, SetFocusModeCommand,
-    SetFontFamilyCommand, SetFontSizeCommand, SetHighlightCommand, SetSelectionCommand,
-    SetWordCountVisibleCommand, SetWritingFormatCommand, SyncNotesCommand, TargetOnly,
-    ToggleListCommand,
+    JumpToAnchorCommand, MarkLayer, MoveEntryCommand, NativeCommand, OpenDocumentCommand,
+    OpenProjectCommand, RenameEntryCommand, ReplaceRangesCommand, SetAlignmentCommand,
+    SetBlockTypeCommand, SetCaretAtDocPosCommand, SetColorCommand, SetContentCommand,
+    SetFocusModeCommand, SetFontFamilyCommand, SetFontSizeCommand, SetHighlightCommand,
+    SetMarkVisibleCommand, SetSelectionCommand, SetWordCountVisibleCommand,
+    SetWritingFormatCommand, SyncNotesCommand, TargetOnly, ToggleListCommand,
 };
 pub use common::{
     Alignment, BlockType, EditorTarget, HistoryAction, ListKind, MarkKind, Pane, RangeEdit,
@@ -83,8 +83,8 @@ pub use envelope::{
 };
 pub use event::{
     ActiveEditorChanged, ActiveMarks, CanvasToolbarChanged, CanvasToolbarState, DocChanged,
-    ProjectChanged, ReadAloudPayloadEvent, SelectionContext, ToolbarState, ViewOptions,
-    WebviewEvent,
+    MarkVisibility, ProjectChanged, ReadAloudPayloadEvent, SelectionContext, ToolbarState,
+    ViewOptions, WebviewEvent,
 };
 pub use map::{
     MapButtonRole, MapButtonRow, MapCalendarMode, MapChoice, MapChoiceInput, MapChromeChanged,

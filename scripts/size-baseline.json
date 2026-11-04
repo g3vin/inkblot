@@ -1,6 +1,6 @@
 {
   "src-tauri/crates/inkblot-core/src/bin/parity.rs": 710,
-  "src-tauri/crates/inkblot-core/src/bridge/tests/fixtures.rs": 1293,
+  "src-tauri/crates/inkblot-core/src/bridge/tests/fixtures.rs": 1137,
   "src-tauri/crates/inkblot-core/src/map/model.rs": 1472,
   "src-tauri/crates/inkblot-core/src/pocket_tts.rs": 807,
   "src-tauri/crates/inkblot-core/src/store/tests.rs": 841,
@@ -11,7 +11,7 @@
   "src/components/FileTree.css": 743,
   "src/components/FileTree.jsx": 1052,
   "src/components/FocusModeOverlay.jsx": 927,
-  "src/components/NoteHoverPreview.jsx": 992,
+  "src/components/NoteHoverPreview.jsx": 945,
   "src/components/Notes.css": 855,
   "src/components/VersionComparePane.jsx": 882,
   "src/extensions/ConversationTile.css": 852,

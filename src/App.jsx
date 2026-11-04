@@ -18,6 +18,7 @@ import { isDarkTheme, resolveTheme, setAccentAttribute, setThemeAttribute, setTr
 import { ACCENT_PRESETS, DEFAULT_ACCENT, DEFAULT_TRAY, TRAY_INKS } from './lib/palette'
 import { useCommands } from './lib/commands'
 import { useKeybindings } from './lib/keybindings'
+import { useMarkVisibilitySetting } from './hooks/useMarkVisibilitySetting'
 import UpdateBanner from './components/UpdateBanner'
 import CommandPalette from './ui/CommandPalette.jsx'
 import { documentSurface } from './bridge'
@@ -170,6 +171,7 @@ export default function App() {
   useEffect(() => {
     documentSurface.publishViewOptions({ wordCountVisible: showWordCountBadge })
   }, [showWordCountBadge])
+  useMarkVisibilitySetting()
 
   // A right-click on anything with a help topic offers it (lib/help.ts).
   useEffect(() => installHelpContextMenu(), [])

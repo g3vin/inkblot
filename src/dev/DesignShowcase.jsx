@@ -27,6 +27,7 @@ import '../components/search/ProjectSearch.css'
 import '../components/Toolbar.css'
 import '../components/FileTree.css'
 import '../components/toolbar/Toolbar.customize.css'
+import '../components/EditorMarks.css'
 import './DesignShowcase.css'
 import { COMMAND_PALETTE } from '../lib/appEvents'
 
@@ -416,6 +417,16 @@ export default function DesignShowcase() {
               <EmptyState icon="note" title="No notes yet." hint="Select some text and press ⌥⌘N to leave yourself a note." />
             </Card>
           </div>
+        </ShowcaseSection>
+
+        <ShowcaseSection title="Name tags · marks over the text">
+          <p className="ib-prose">
+            <span className="entity-mention" style={{ '--entity-ink': inkVar('violet') }} title="⌘-click to open Kira">Kira</span>{' met '}
+            <span className="entity-mention" style={{ '--entity-ink': inkVar('violet') }} title="⌘-click to open Olm">Olm</span>{' at the '}
+            <span className="entity-mention" style={{ '--entity-ink': inkVar('teal') }} title="⌘-click to open Harbor">Harbor</span>
+            {', under a '}
+            <span className="entity-mention" style={{ '--entity-ink': inkVar('green') }} title="⌘-click to open Rose">Rose</span>{' arch.'}
+          </p>
         </ShowcaseSection>
 
         <ShowcaseSection title="Paper · sheets and piles (the landing page)">

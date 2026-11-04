@@ -6,12 +6,16 @@
  * is created. That's what makes a canvas of hundreds of cards affordable.
  *
  * Memoized on the node's stored JSON, so dragging a card (which doesn't change
- * its content) regenerates nothing.
+ * its content) regenerates nothing. Its name tags are written into that HTML
+ * (cardTags.js), and redrawn only when the names to look for change.
  */
 import { useMemo } from 'react'
 import { generateHTML } from '@tiptap/core'
 import { getCardExtensions } from '../lib/editorExtensions'
+import { endPreview, openFromPane, openTagFromEvent, paneOfElement, previewTagAt } from '../lib/entityLinks'
 import CanvasCardEditor from './CanvasCardEditor'
+import { useCanvasDocPath } from './canvasDocContext'
+import { tagCardHtml, useCardNameIndex } from './cardTags'
 
 const escapeHtml = (value) =>
   String(value)
@@ -27,6 +31,8 @@ const plainTextToHtml = (text) =>
     .join('')
 
 export default function CanvasTextNode({ node, editing, setActiveEditor, onCommit, onExit }) {
+  const canvasPath = useCanvasDocPath()
+  const nameIndex = useCardNameIndex()
   const html = useMemo(() => {
     if (node.inkblotTipTap) {
       try {
@@ -39,11 +45,13 @@ export default function CanvasTextNode({ node, editing, setActiveEditor, onCommi
     }
     return plainTextToHtml(node.text)
   }, [node.inkblotTipTap, node.text])
+  const taggedHtml = useMemo(() => tagCardHtml(html, nameIndex, canvasPath), [html, nameIndex, canvasPath])
 
   if (editing) {
     return (
       <CanvasCardEditor
         node={node}
+        docPath={canvasPath}
         setActiveEditor={setActiveEditor}
         onCommit={onCommit}
         onExit={onExit}
@@ -62,7 +70,11 @@ export default function CanvasTextNode({ node, editing, setActiveEditor, onCommi
     // a static card and an editing card look identical.
     <div
       className="canvas-card-body ProseMirror"
-      dangerouslySetInnerHTML={{ __html: html }}
+      // A ⌘-click on a tag opens its entry, ahead of the card's own press (a drag).
+      onPointerDown={(event) => openTagFromEvent(event, (path, beside) => openFromPane(paneOfElement(event.currentTarget), path, beside))}
+      onMouseOver={(event) => previewTagAt(event.target)}
+      onMouseLeave={endPreview}
+      dangerouslySetInnerHTML={{ __html: taggedHtml }}
     />
   )
 }

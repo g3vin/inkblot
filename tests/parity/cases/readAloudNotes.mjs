@@ -95,6 +95,9 @@ const RAW_NOTES = [
   { id: 'n24', updatedAt: '2026-01-05T00:00:00.000Z' },
   { id: 'n25', content: 42, anchor: ['a'] },
   { id: 'n26', futureField: { added: 'by a newer build' }, another: [1, 2, 3] },
+  { id: 'n27', characters: ['Characters/Kira', 'Characters/Olm', 'Characters/Kira'] },
+  { id: 'n28', characters: ['', 7, null, 'Settings/Harbor', ['nested']] },
+  { id: 'n29', characters: 'Characters/Kira' },
 ]
 
 const CLIPS = [

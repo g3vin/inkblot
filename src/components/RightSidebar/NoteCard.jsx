@@ -6,8 +6,9 @@
  * textarea attaches them.
  *
  * Its tools sit where a hover note's do (NoteHoverPreview), so a hand that knows one
- * knows the other: the colour dot top left and delete top right; memo and image
- * bottom left, a connected note in the middle, the branch's collapse bottom right.
+ * knows the other: the colour dot top left and delete top right; memo, image and
+ * characters bottom left, a connected note in the middle, the branch's collapse
+ * bottom right.
  * The panel adds the time and the pin before delete.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -18,6 +19,7 @@ import { AudioClipList, AudioRecordButton } from '../AudioNotes'
 import { pickNoteImages, readClipboardImages } from '../../lib/noteImageUtils'
 import { NOTE_COLOR_OPTIONS, isNoteEmpty, noteColor, noteInk } from '../../lib/noteUtils'
 import InkWheel from '../../ui/InkWheel.jsx'
+import { NoteCharacterButton, NoteCharacterChips } from '../NoteCharacters'
 
 const NOTE_COLOR_TRIGGER = { className: 'note-tool-btn', children: <span className="note-color-dot" aria-hidden="true" /> }
 
@@ -34,6 +36,7 @@ export default function NoteCard({
   onAddImages,
   onRemoveImage,
   onChangeAudio,
+  onChangeCharacters,
   projectName,
   hasChildren = false,
   // Opening or closing with its branch (NotesPanel): { state, card: { delay, ms } }.
@@ -167,6 +170,8 @@ export default function NoteCard({
         onChange={onChangeAudio}
       />
 
+      <NoteCharacterChips characters={note.characters} />
+
       <div className="note-tile-footer">
         {/* Keeps the focus where it is: clicking one of these while writing must not
             blur the note out from under the click. */}
@@ -190,6 +195,7 @@ export default function NoteCard({
           >
             <Icon name="image" />
           </button>
+          <NoteCharacterButton characters={note.characters} onChange={onChangeCharacters} />
         </div>
 
         <button

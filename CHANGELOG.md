@@ -14,6 +14,23 @@ Notable changes to Inkblot. The format follows
   skips the note. If Inkblot crashes, it saves a crash report on its own and mentions
   it the next time it opens. Reports stay on your Mac, in your Logs folder, and never
   include your writing. Settings ▸ Bug reports shows them in Finder or deletes them.
+- **Name tags:** characters, places and the entries of your own folder types are
+  underlined where your writing names them, in their folder's colour. ⌘-click a name to
+  open it (its canvas, if it has one), or ⌥⌘-click to open it beside. Give an entry
+  other names (a nickname, a surname) in the new Details panel and those are found too.
+  Rest the pointer on a name to see its card: what it is, its other names and the first
+  lines of its page. Names on canvas cards are tagged too.
+- **Names that are also words:** a character called Will isn't tagged in "Will you
+  come?", and Rose isn't in "Rose petals fell." Inkblot reads the sentence on your Mac
+  to tell the difference. Switch on "Always tag" in the Details panel for a name it
+  gets wrong.
+- **Show menu:** a new toolbar button turns off what's drawn over your text: name tags,
+  note dots, bubble icons and timeline passages, one at a time or all at once.
+- **Point of view:** set whose point of view a document is told from, in the Details
+  panel or from the file tree's right-click menu.
+- **A note's characters:** mark which characters a note is about from its card. They
+  show as tags on the note, and follow a character when it's renamed or moved. The
+  Notes panel can show just one character's notes.
 
 ## [0.4.1] - 2026-10-24
 
