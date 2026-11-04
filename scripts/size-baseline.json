@@ -11,7 +11,7 @@
   "src/components/FileTree.css": 743,
   "src/components/FileTree.jsx": 1052,
   "src/components/FocusModeOverlay.jsx": 927,
-  "src/components/NoteHoverPreview.jsx": 992,
+  "src/components/NoteHoverPreview.jsx": 945,
   "src/components/Notes.css": 855,
   "src/components/VersionComparePane.jsx": 882,
   "src/extensions/ConversationTile.css": 852,
