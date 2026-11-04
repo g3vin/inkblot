@@ -16,9 +16,11 @@ use serde_json::{json, Value};
 
 // Fixtures (one of everything) and the Print Layout tests live in their own files.
 mod fixtures;
+mod map_fixtures;
 mod print;
 
 use fixtures::*;
+use map_fixtures::*;
 
 /// Round-trip through JSON and back, the way both halves will.
 fn round_trip<T>(value: &T) -> T
