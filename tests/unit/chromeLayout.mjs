@@ -16,7 +16,7 @@ const EXPECTED_IDS = [
   'inkblot.format.highlight', 'inkblot.format.alignment', 'inkblot.format.paragraph-style',
   'inkblot.format.bulleted-list', 'inkblot.format.numbered-list', 'inkblot.insert.table',
   'inkblot.insert.conversation', 'inkblot.insert.note', 'inkblot.edit.undo-redo', 'inkblot.edit.paste-and-match-style',
-  'inkblot.view.focus-mode', 'inkblot.view.word-count',
+  'inkblot.view.focus-mode', 'inkblot.view.word-count', 'inkblot.view.marks',
   'inkblot.canvas.lock', 'inkblot.canvas.add-card', 'inkblot.canvas.add-image', 'inkblot.canvas.record-memo',
   'inkblot.canvas.color', 'inkblot.canvas.group', 'inkblot.canvas.undo-redo', 'inkblot.canvas.alignment-guides',
   'inkblot.canvas.snap-to-grid', 'inkblot.canvas.zoom', 'inkblot.canvas.delete',
@@ -93,7 +93,7 @@ ok('the canvas toolbar is not given focus mode', !L.normalizeToolbar('canvas', J
 const [writePage, insertPage, ...extraPages] = L.pagesOf(L.DEFAULT_TOOLBARS.document).map((page) => page.filter((id) => !L.isSpacer(id)))
 ok('the document toolbar has two pages', insertPage && extraPages.length === 0)
 ok('its first page leads with the view, undo/redo, then type',
-  writePage.slice(0, 7).join() === 'inkblot.view.page-view,inkblot.view.focus-mode,inkblot.edit.undo-redo,inkblot.format.text-style,inkblot.format.paragraph-style,inkblot.format.font,inkblot.format.font-size')
+  writePage.slice(0, 8).join() === 'inkblot.view.page-view,inkblot.view.focus-mode,inkblot.view.marks,inkblot.edit.undo-redo,inkblot.format.text-style,inkblot.format.paragraph-style,inkblot.format.font,inkblot.format.font-size')
 ok('its second page is inserting and the voice', insertPage.join() === 'inkblot.insert.note,inkblot.insert.table,inkblot.insert.conversation,inkblot.speech.dictation,inkblot.speech.read-aloud')
 ok('the other toolbars are one page', ['canvas', 'map', 'timeline', 'typeset'].every((context) => !L.DEFAULT_TOOLBARS[context].includes(L.PAGE)))
 
@@ -137,16 +137,16 @@ ok('adding: nothing it already has', L.adding(['a'], ['a'], ['a']).join('') === 
 
 const I = (raw) => L.normalizeInspectorLayouts(raw)
 let layouts = I(null)
-ok('nothing saved: Write has its defaults', L.tabsOf(layouts, 'drafting').join() === 'clipboard,workbench,notes,timeline,references,history,stats')
-ok('and Typeset has its own', L.tabsOf(layouts, 'finishing').join() === 'typeset,output,notes,references,history,stats')
-ok('corrupt JSON is the defaults', L.tabsOf(I('][') , 'drafting').length === 7)
+ok('nothing saved: Write has its defaults', L.tabsOf(layouts, 'drafting').join() === 'clipboard,workbench,notes,timeline,references,history,stats,details')
+ok('and Typeset has its own', L.tabsOf(layouts, 'finishing').join() === 'typeset,output,notes,references,history,stats,details')
+ok('corrupt JSON is the defaults', L.tabsOf(I('][') , 'drafting').length === 8)
 
 // An earlier version's bare map, from before Stats, Typeset and Print & Export: with no
 // known list, those are the ones it never knew about.
 layouts = I(JSON.stringify({ drafting: ['notes', 'clipboard', 'history'], finishing: ['page', 'book', 'publish', 'notes'] }))
 ok('renamed tabs read as what they became, once', L.tabsOf(layouts, 'finishing').slice(0, 2).join() === 'typeset,output')
 ok('a tab added later arrives after the one it follows by default',
-  L.tabsOf(layouts, 'drafting').join() === 'notes,timeline,clipboard,history,stats')
+  L.tabsOf(layouts, 'drafting').join() === 'notes,timeline,clipboard,history,stats,details')
 ok('a layout that has it by default gets it once', L.tabsOf(layouts, 'finishing').filter((t) => t === 'stats').length === 1)
 
 layouts = I(JSON.stringify({ layouts: { drafting: ['notes'] }, known: L.ARRANGEABLE_TABS }))
@@ -156,7 +156,7 @@ layouts = I(JSON.stringify({ layouts: { drafting: ['map', 'nonsense', 'notes', '
 ok('the map, unknown tabs and repeats are dropped', L.tabsOf(layouts, 'drafting').join() === 'notes')
 
 layouts = I(JSON.stringify({ layouts: { drafting: [] }, known: L.ARRANGEABLE_TABS }))
-ok('an empty layout falls back to its defaults', L.tabsOf(layouts, 'drafting').length === 7)
+ok('an empty layout falls back to its defaults', L.tabsOf(layouts, 'drafting').length === 8)
 
 layouts = I(JSON.stringify({ layouts: {}, known: L.ARRANGEABLE_TABS, last: { drafting: 'notes', finishing: 'bogus' } }))
 ok('the last tab per layout reads back, and a bad one is dropped', layouts.last.drafting === 'notes' && !layouts.last.finishing)
@@ -167,7 +167,7 @@ ok('a round trip keeps a hidden tab hidden', !L.tabsOf(round, 'drafting').includ
 /* ---------------- Customize Layout… ---------------- */
 
 layouts = I(null)
-ok('rows: shown in order, then the rest', L.rowsFor(layouts, 'drafting').join() === 'clipboard,workbench,notes,timeline,references,history,stats,typeset,output')
+ok('rows: shown in order, then the rest', L.rowsFor(layouts, 'drafting').join() === 'clipboard,workbench,notes,timeline,references,history,stats,details,typeset,output')
 
 layouts = L.setTabShown(layouts, 'drafting', 'output', true)
 ok('a newly shown tab goes last', L.tabsOf(layouts, 'drafting').at(-1) === 'output')
@@ -177,13 +177,13 @@ only = L.setTabShown(only, 'drafting', 'notes', false)
 ok('the last tab cannot be hidden', L.tabsOf(only, 'drafting').join() === 'notes')
 
 layouts = L.moveTab(I(null), 'drafting', 0, 3)
-ok('a move reorders the shown tabs', L.tabsOf(layouts, 'drafting').join() === 'workbench,notes,clipboard,timeline,references,history,stats')
+ok('a move reorders the shown tabs', L.tabsOf(layouts, 'drafting').join() === 'workbench,notes,clipboard,timeline,references,history,stats,details')
 
-layouts = L.moveTab(I(null), 'drafting', 0, 9)
+layouts = L.moveTab(I(null), 'drafting', 0, 10)
 ok('a shown tab dragged among the hidden ones stays ahead of them',
-  L.tabsOf(layouts, 'drafting').join() === 'workbench,notes,timeline,references,history,stats,clipboard')
+  L.tabsOf(layouts, 'drafting').join() === 'workbench,notes,timeline,references,history,stats,details,clipboard')
 
-layouts = L.moveTab(I(null), 'drafting', 8, 0)
+layouts = L.moveTab(I(null), 'drafting', 9, 0)
 ok('a hidden row does not become shown by moving', !L.tabsOf(layouts, 'drafting').includes('output'))
 
 layouts = L.restoreInspectorDefaults(L.setTabShown(I(null), 'drafting', 'clipboard', false), 'drafting')

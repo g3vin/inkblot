@@ -1466,6 +1466,7 @@ export type NativeCommand =
 	| { type: "editorHistory", payload: EditorHistoryCommand }
 	| { type: "setFocusMode", payload: SetFocusModeCommand }
 	| { type: "setWordCountVisible", payload: SetWordCountVisibleCommand }
+	| { type: "setMarkVisible", payload: SetMarkVisibleCommand }
 	| { type: "addReference", payload: AddReferenceCommand }
 	| { type: "createReference", payload: CreateReferenceCommand }
 	| { type: "updateReference", payload: UpdateReferenceCommand }
@@ -3012,6 +3013,21 @@ export interface MapToggleInput {
 }
 
 /**
+ * Which of the marks the page draws over the writer's text are shown. None of them
+ * is content: hiding one changes nothing that is saved or printed.
+ */
+export interface MarkVisibility {
+	/** Characters, places and other story entries named in the text. */
+	names: boolean;
+	/** Note dots, and the tint on the text a note is about. */
+	notes: boolean;
+	/** Bubble session chips. */
+	bubbles: boolean;
+	/** Timeline passages: their tint and their event chips. */
+	timeline: boolean;
+}
+
+/**
  * Lay the book (or the document) out without printing it, to count its pages and
  * words for the Publish tab.
  */
@@ -3094,6 +3110,8 @@ export interface Note {
 	previewSize: NotePreviewSize;
 	images: NoteImage[];
 	audio: AudioClip[];
+	/** Tree paths of the story entries (characters, mostly) the note is about. */
+	characters: string[];
 	createdAt: string;
 	updatedAt: string;
 	/**
@@ -3114,6 +3132,8 @@ export interface NotePatch {
 	images?: NoteImage[];
 	/** The whole list, as for images. */
 	audio?: AudioClip[];
+	/** The whole list of tree paths, as for images. */
+	characters?: string[];
 	/**
 	 * Where the hover card was dragged to — for a root card, relative to its default
 	 * place beside the anchor; for a reply, relative to its parent's card.
@@ -4237,6 +4257,20 @@ export interface SetHighlightCommand {
 	remember: boolean;
 }
 
+/** One layer of the marks the page draws over the text (`MarkVisibility`). */
+export enum MarkLayer {
+	Names = "names",
+	Notes = "notes",
+	Bubbles = "bubbles",
+	Timeline = "timeline",
+}
+
+/** Show or hide one kind of mark. */
+export interface SetMarkVisibleCommand {
+	mark: MarkLayer;
+	visible: boolean;
+}
+
 /**
  * Replace the active document's page setup — one undo step in the document — or the
  * book's.
@@ -4379,6 +4413,8 @@ export enum SidebarTab {
 	History = "history",
 	References = "references",
 	Timeline = "timeline",
+	/** A document's own fields: its point of view, an entry's other names. */
+	Details = "details",
 }
 
 /**
@@ -4960,12 +4996,14 @@ export interface VersionRow {
 
 /**
  * The page's own view settings that a shell offers as toolbar toggles, pushed whole
- * whenever either changes and once at startup. The page still owns both: the shell
- * asks with `setFocusMode` / `setWordCountVisible` and lights its buttons from this.
+ * whenever any changes and once at startup. The page still owns them: the shell asks
+ * with `setFocusMode` / `setWordCountVisible` / `setMarkVisible` and lights its
+ * buttons from this.
  */
 export interface ViewOptions {
 	focusMode: boolean;
 	wordCountVisible: boolean;
+	marks: MarkVisibility;
 }
 
 export enum TileKind {

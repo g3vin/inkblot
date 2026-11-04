@@ -103,6 +103,11 @@ const normalizeNoteImages = (images = []) => (
 )
 
 /** Fill in defaults/coerce every note field; safe to call on untrusted or legacy data. */
+/** The characters a note is about: tree paths, each once, in the order given. */
+const normalizeNoteCharacters = (characters) => (
+  Array.isArray(characters) ? [...new Set(characters.filter((path) => typeof path === 'string' && path))] : []
+)
+
 export const normalizeNote = (raw = {}) => {
   // Anything that is not an object is an empty note, not a crash or its characters as keys.
   const note = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
@@ -128,6 +133,7 @@ export const normalizeNote = (raw = {}) => {
     // Voice memos. Unlike images (base64 in the note), these are asset paths — see
     // audioNotes.js for why.
     audio: normalizeNoteAudio(note.audio),
+    characters: normalizeNoteCharacters(note.characters),
     createdAt,
     updatedAt,
     timestamp: formatNoteTimestamp(updatedAt),

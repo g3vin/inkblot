@@ -933,6 +933,7 @@ export default function NoteHoverPreview({
               lockPreview={lockPreview}
               onChangeAudio={(audio) => handleChangeAudio(note.id, audio)}
               onAddImages={(images) => handleAddImages(note.id, images)}
+              onChangeCharacters={(characters) => updateNote(note.id, (current) => touchNote(current, { characters }))}
               onAddChild={() => handleAddChild(note.id)}
               onToggleCollapse={() => handleToggleCollapse(note.id)}
             />

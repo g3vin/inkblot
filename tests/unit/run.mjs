@@ -96,6 +96,8 @@
  *   tables cell fills and table borders in the document and the exports, and the
  *          table toolbar's tools
  *   presets the writer's own folder types: matching, saved with the project, the sheet
+ *   names  name tags: the story entries, whole-word matching, the tags in a real editor
+ *          and ⌘-click, aliases and points of view following renames, the Show menu
  *   updates after an update: once per version, highlights from a release, the banner
  *   windows a tab dragged out into a window of its own, put back, kept on top
  *   emptiness which notes, documents and folders are blank enough to delete without asking
@@ -137,7 +139,7 @@
  * session restore, file-tree drag, note previews, Pinterest embeds, and editor
  * paste/drag. Those need the real webview.
  */
-const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'speech', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'inkwheel', 'icons', 'help', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks', 'keys', 'tables', 'presets', 'updates', 'windows', 'emptiness', 'reveal', 'landing', 'selection', 'focus', 'physics', 'toolwheel', 'affected', 'hooks', 'diagnostics']
+const SUITES = ['persistence', 'geo', 'red', 'edge', 'card', 'asset', 'group', 'snap', 'search', 'note', 'audio', 'html', 'dom', 'editor', 'tree', 'prefs', 'speech', 'bridge', 'entries', 'sidebar', 'bubble', 'print', 'finishing', 'typeset', 'references', 'citations', 'maplib', 'maptrace', 'mapdom', 'mapchrome', 'tabs', 'css', 'ui', 'inkwheel', 'icons', 'help', 'chromeLayout', 'toolbar', 'inspector', 'stats', 'statsdom', 'book', 'notegeom', 'timeline', 'conversation', 'spaceswipe', 'locks', 'keys', 'tables', 'presets', 'names', 'updates', 'windows', 'emptiness', 'reveal', 'landing', 'selection', 'focus', 'physics', 'toolwheel', 'affected', 'hooks', 'diagnostics']
 
 const args = process.argv.slice(2)
 const verbose = args.includes('--verbose') || process.env.TEST_VERBOSE === '1'

@@ -23,7 +23,7 @@ const DEFAULT_TOOLBAR_STATE = {
 const NO_CANVAS = {}
 const NO_MAP = {}
 const NO_TIMELINE = {}
-const DEFAULT_VIEW = { focusMode: false, wordCountVisible: true }
+const DEFAULT_VIEW = { focusMode: false, wordCountVisible: true, marks: { names: true, notes: true, bubbles: true, timeline: true } }
 
 /** What every item reads: the published state, the display mode, and how to send. */
 export function useToolbarContext({ editor, activeDoc, hasProject, panel, split, timer, display }) {

@@ -1,0 +1,30 @@
+/* A note's characters, on both of its cards (NoteCharacters.jsx). */
+
+.note-characters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.note-character {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.note-character:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.note-character.is-missing {
+  cursor: default;
+  opacity: 0.7;
+}

@@ -71,6 +71,7 @@ export const TOOLBAR_ITEMS: ToolbarItemSpec[] = [
   { id: 'inkblot.edit.paste-and-match-style', label: 'Paste and match style', icon: 'clipboard', contexts: ['document'] },
   { id: 'inkblot.view.focus-mode', label: 'Focus mode', icon: 'crosshair', contexts: ['document'] },
   { id: 'inkblot.view.word-count', label: 'Word count', icon: 'number', contexts: ['document'] },
+  { id: 'inkblot.view.marks', label: 'Show', icon: 'show', contexts: ['document'] },
 
   { id: 'inkblot.canvas.lock', label: 'Lock', icon: 'lock', contexts: ['canvas'] },
   { id: 'inkblot.canvas.add-card', label: 'Add card', icon: 'add', contexts: ['canvas'] },
@@ -143,7 +144,7 @@ export const DEFAULT_TOOLBARS: Record<ToolbarContext, string[]> = {
   // Two pages: writing, then inserting and the voice. A window too narrow for a page
   // carries the rest of it onto the page after.
   document: [
-    'inkblot.view.page-view', 'inkblot.view.focus-mode', SPACE,
+    'inkblot.view.page-view', 'inkblot.view.focus-mode', 'inkblot.view.marks', SPACE,
     'inkblot.edit.undo-redo', SPACE,
     'inkblot.format.text-style', SPACE,
     'inkblot.format.paragraph-style', 'inkblot.format.font', 'inkblot.format.font-size', SPACE,
@@ -304,7 +305,7 @@ export function normalizeDisplayMode(raw: unknown): ToolbarDisplayMode {
 
 /* ---------------- the inspector ---------------- */
 
-export type InspectorTab = 'clipboard' | 'workbench' | 'notes' | 'timeline' | 'references' | 'history' | 'typeset' | 'output' | 'stats' | 'map'
+export type InspectorTab = 'clipboard' | 'workbench' | 'notes' | 'timeline' | 'references' | 'history' | 'typeset' | 'output' | 'stats' | 'details' | 'map'
 export type InspectorLayoutKind = 'drafting' | 'finishing'
 export const INSPECTOR_LAYOUT_KINDS: InspectorLayoutKind[] = ['drafting', 'finishing']
 
@@ -321,6 +322,7 @@ export const INSPECTOR_TABS: InspectorTabSpec[] = [
   { id: 'typeset', title: 'Typeset', icon: 'type-style' },
   { id: 'output', title: 'Print & export', icon: 'print' },
   { id: 'stats', title: 'Stats', icon: 'chart' },
+  { id: 'details', title: 'Details', icon: 'info' },
   { id: 'map', title: 'Map', icon: 'map' },
 ]
 export const inspectorTab = (id: string) => INSPECTOR_TABS.find((tab) => tab.id === id)
@@ -332,8 +334,8 @@ export const INSPECTOR_LAYOUT_INFO: Record<InspectorLayoutKind, { title: string;
 }
 
 export const DEFAULT_INSPECTOR_TABS: Record<InspectorLayoutKind, InspectorTab[]> = {
-  drafting: ['clipboard', 'workbench', 'notes', 'timeline', 'references', 'history', 'stats'],
-  finishing: ['typeset', 'output', 'notes', 'references', 'history', 'stats'],
+  drafting: ['clipboard', 'workbench', 'notes', 'timeline', 'references', 'history', 'stats', 'details'],
+  finishing: ['typeset', 'output', 'notes', 'references', 'history', 'stats', 'details'],
 }
 
 export const layoutForMode = (mode: string): InspectorLayoutKind => (mode === 'typeset' ? 'finishing' : 'drafting')
@@ -341,7 +343,7 @@ export const layoutForMode = (mode: string): InspectorLayoutKind => (mode === 't
 /** Tabs that became others: Page and Book are Typeset now, Publish is Print & Export. */
 const RENAMED_TABS: Record<string, InspectorTab> = { page: 'typeset', book: 'typeset', publish: 'output' }
 /** Tabs added after layouts could first be saved. */
-const ADDED_LATER: InspectorTab[] = ['stats', 'typeset', 'output', 'timeline']
+const ADDED_LATER: InspectorTab[] = ['stats', 'typeset', 'output', 'timeline', 'details']
 
 export type InspectorLayouts = {
   version: 1

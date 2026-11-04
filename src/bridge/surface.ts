@@ -215,7 +215,7 @@ export function createDocumentSurface({
 }: DocumentSurfaceOptions): DocumentSurface {
   let delegates = initialDelegates
   let lastHighlightColor: string = TOOLBAR_DEFAULTS.highlight
-  let viewOptions: ViewOptions = { focusMode: false, wordCountVisible: true }
+  let viewOptions: ViewOptions = { focusMode: false, wordCountVisible: true, marks: { names: true, notes: true, bubbles: true, timeline: true } }
   const subscriptions: Unsubscribe[] = []
 
   /* ---------------- docChanged ---------------- */

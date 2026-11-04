@@ -222,6 +222,7 @@ fn every_command_has_its_documented_wire_name() {
             "editorHistory",
             "setFocusMode",
             "setWordCountVisible",
+            "setMarkVisible",
             "addReference",
             "createReference",
             "updateReference",
@@ -500,10 +501,26 @@ fn the_toolbar_items_speak_camel_case() {
     let event = WebviewEvent::ViewOptions(ViewOptions {
         focus_mode: true,
         word_count_visible: false,
+        marks: MarkVisibility {
+            names: false,
+            ..MarkVisibility::default()
+        },
     });
     assert_eq!(
         serde_json::to_value(&event).unwrap(),
-        json!({ "type": "viewOptions", "payload": { "focusMode": true, "wordCountVisible": false } })
+        json!({ "type": "viewOptions", "payload": {
+            "focusMode": true,
+            "wordCountVisible": false,
+            "marks": { "names": false, "notes": true, "bubbles": true, "timeline": true },
+        } })
+    );
+    let command = NativeCommand::SetMarkVisible(SetMarkVisibleCommand {
+        mark: MarkLayer::Bubbles,
+        visible: true,
+    });
+    assert_eq!(
+        serde_json::to_value(&command).unwrap(),
+        json!({ "type": "setMarkVisible", "payload": { "mark": "bubbles", "visible": true } })
     );
 }
 

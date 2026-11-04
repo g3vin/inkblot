@@ -43,6 +43,9 @@ pub struct NotePatch {
     /// The whole list, as for images.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio: Option<Vec<AudioClip>>,
+    /// The whole list of tree paths, as for images.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub characters: Option<Vec<String>>,
     /// Where the hover card was dragged to — for a root card, relative to its default
     /// place beside the anchor; for a reply, relative to its parent's card.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -255,6 +258,8 @@ pub enum SidebarTab {
     History,
     References,
     Timeline,
+    /// A document's own fields: its point of view, an entry's other names.
+    Details,
 }
 
 /// The page wants a sidebar tab shown — "Add note", "Open Version History", a new

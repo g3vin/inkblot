@@ -197,7 +197,7 @@ pub fn normalize_note_audio(
 /// **Unknown keys are preserved**, because `normalizeNote` spreads the original note
 /// before overriding the fields it owns — so a key written by a newer build survives a
 /// round-trip through an older one.
-const MODELED_KEYS: [&str; 17] = [
+const MODELED_KEYS: [&str; 18] = [
     "id",
     "type",
     "content",
@@ -212,10 +212,27 @@ const MODELED_KEYS: [&str; 17] = [
     "previewSize",
     "images",
     "audio",
+    "characters",
     "createdAt",
     "updatedAt",
     "timestamp",
 ];
+
+/// The characters a note is about: tree paths, each once, in the order given.
+fn normalize_note_characters(raw: &Value) -> Vec<String> {
+    let mut paths: Vec<String> = Vec::new();
+    for path in raw
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+    {
+        if !path.is_empty() && !paths.iter().any(|seen| seen == path) {
+            paths.push(path.to_owned());
+        }
+    }
+    paths
+}
 
 /// Fill in defaults and coerce every field. Safe on untrusted or legacy data.
 pub fn normalize_note(raw: &Value, defaults: &NoteDefaults) -> Note {
@@ -264,6 +281,7 @@ pub fn normalize_note(raw: &Value, defaults: &NoteDefaults) -> Note {
             })
             .unwrap_or_default(),
         audio: normalize_note_audio(&raw["audio"], defaults.new_id, defaults.now_iso),
+        characters: normalize_note_characters(&raw["characters"]),
         timestamp: (defaults.format_time)(&updated_at),
         created_at,
         updated_at,

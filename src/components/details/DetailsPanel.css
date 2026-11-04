@@ -1,0 +1,11 @@
+/* The inspector's Details tab (DetailsPanel.jsx). */
+
+.details-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; font-family: var(--font-ui); }
+.details-body { flex: 1; min-height: 0; overflow: auto; padding: 0 var(--space-3) var(--space-5); }
+.details-hint { margin: 0 0 var(--space-3); }
+
+.details-aliases { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); padding: 0; list-style: none; }
+.details-alias { display: inline-flex; align-items: center; gap: 2px; }
+
+.details-alias-add { display: flex; align-items: center; gap: var(--space-2); }
+.details-alias-add > :first-child { flex: 1; min-width: 0; }

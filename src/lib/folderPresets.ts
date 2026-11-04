@@ -63,6 +63,9 @@ export function useSavedFolderPresets(): SavedFolderPreset[] {
 /** Every preset for the open project, now. */
 export const allFolderPresets = (): Preset[] => state.all
 
+/** Hear every change to the open project's presets. */
+export const onFolderPresetsChange = subscribe
+
 /* ---------------- on disk ---------------- */
 
 const presetsPath = async (projectName: string) => joinPath(await getProjectRoot(projectName), '.story', 'folder-presets.json')

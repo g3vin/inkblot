@@ -368,6 +368,7 @@ pub(super) fn every_command() -> Vec<NativeCommand> {
             note_id: "n1".into(),
             patch: NotePatch {
                 pinned: Some(true),
+                characters: Some(vec!["Characters/Kira".into()]),
                 ..Default::default()
             },
         }),
@@ -440,6 +441,10 @@ pub(super) fn every_command() -> Vec<NativeCommand> {
         }),
         NativeCommand::SetFocusMode(SetFocusModeCommand { open: true }),
         NativeCommand::SetWordCountVisible(SetWordCountVisibleCommand { visible: false }),
+        NativeCommand::SetMarkVisible(SetMarkVisibleCommand {
+            mark: MarkLayer::Names,
+            visible: false,
+        }),
         NativeCommand::AddReference(AddReferenceCommand {
             id: "r1".into(),
             doc_path: Some("a".into()),
@@ -892,6 +897,7 @@ pub(super) fn every_event() -> Vec<WebviewEvent> {
         WebviewEvent::ViewOptions(ViewOptions {
             focus_mode: false,
             word_count_visible: true,
+            marks: MarkVisibility::default(),
         }),
         WebviewEvent::ReferencesChanged(ReferencesChanged {
             doc_path: Some("a".into()),

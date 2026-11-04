@@ -49,6 +49,10 @@ import { useCommands } from '../lib/commands'
 import { createClipboardNote, createFreeNote, createQuoteNote } from '../lib/noteUtils'
 import { requestDraftKind } from '../lib/draftDocument'
 import { requestFind, requestMapFind } from '../lib/sidebarSearch'
+import { observeDocumentFieldPaths, refreshDocumentFields } from '../lib/documentFields'
+import { useDocumentFieldCommands } from '../hooks/useDocumentFieldCommands'
+import { observeNoteCharacterPaths } from '../lib/noteCharacterLinks'
+import EntityPreview from './EntityPreview'
 import { refreshFolderPresets } from '../lib/folderPresets'
 import FolderPresetsSheet from './FolderPresetsSheet'
 import { refreshLocks, setDocumentLocked, setFolderLocked, useLockReason, useLocks } from '../lib/docLocks'
@@ -257,14 +261,18 @@ export default function EditorLayout(props) {
   }, [activeDoc, currentDoc, props.activeEditor])
 
   // The project's locks (docLocks.ts), read when it opens; the file tree re-reads them.
-  // And its own folder types (folderPresets.ts).
+  // And its own folder types (folderPresets.ts) and document fields (documentFields.ts).
   useEffect(() => {
     void refreshLocks(props.projectName)
     void refreshFolderPresets(props.projectName)
+    void refreshDocumentFields(props.projectName)
   }, [props.projectName])
+  useEffect(() => observeDocumentFieldPaths(), [])
+  useEffect(() => observeNoteCharacterPaths(), [])
   // A locked document opens with its badge, never gains it a moment later (Editor's RevealGate).
   useRevealReady('locks', useLocks().project === props.projectName)
   const lockTarget = activeDoc || currentDoc
+  useDocumentFieldCommands({ docPath: lockTarget, openRightSidebarTab })
   const lock = useLockReason(lockTarget)
 
   const leftShown = left.shown
@@ -606,6 +614,8 @@ export default function EditorLayout(props) {
           refreshFiles={props.refreshFiles}
           onOpenDocInTab={props.onOpenDocInTab}
         />
+
+        <EntityPreview />
 
         <NoteHoverPreview
           notesByDoc={props.notesByDoc}

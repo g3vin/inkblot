@@ -36,6 +36,7 @@ export const TOOLBAR_COMPONENTS = {
   'inkblot.edit.paste-and-match-style': D.PasteAndMatchStyleItem,
   'inkblot.view.focus-mode': D.FocusModeItem,
   'inkblot.view.word-count': D.WordCountItem,
+  'inkblot.view.marks': D.MarksItem,
   'inkblot.speech.dictation': D.DictationItem,
   'inkblot.speech.read-aloud': D.ReadAloudItem,
   'inkblot.view.editor-mode': D.EditorModeItem,

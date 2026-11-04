@@ -8,7 +8,8 @@
  * a second copy of the project to drift from the first.
  *
  * The last tree each project showed is kept for the session, so reopening a project
- * draws its sidebar at once while the tree is read again underneath.
+ * draws its sidebar at once while the tree is read again underneath. What else needs
+ * the tree (the story entries name tags look for) hears each one as it is kept.
  */
 import { listProjectTree, loadDocument } from './FileSystem'
 
@@ -46,8 +47,18 @@ export function readDocument(projectName, docPath) {
   return take(`doc:${projectName}::${docPath}`) ?? loadDocument(projectName, docPath)
 }
 
+const treeListeners = new Set()
+
 export function rememberTree(projectName, tree) {
-  if (projectName) trees.set(projectName, tree)
+  if (!projectName) return
+  trees.set(projectName, tree)
+  treeListeners.forEach((listener) => listener(projectName, tree))
+}
+
+/** Hear each tree the file tree reads: `listener(projectName, tree)`. */
+export function onTreeRemembered(listener) {
+  treeListeners.add(listener)
+  return () => { treeListeners.delete(listener) }
 }
 
 export function recallTree(projectName) {

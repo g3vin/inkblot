@@ -11,7 +11,7 @@
  * refuses to write one (see FileSystem.js) — all persistence goes through
  * canvasFileSystem.js.
  */
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useReveal } from '../ui/revealState.js'
 import { CanvasSkeleton, PaneSurfaceReveal } from './PaneSkeletons'
 import { loadCanvasDocument } from '../lib/canvasFileSystem'
@@ -19,6 +19,8 @@ import { useLockReason } from '../lib/docLocks'
 import DocLockBadge from '../components/DocLockBadge'
 import { CanvasNotesProvider } from './CanvasNotesContext'
 import CanvasSurface from './CanvasSurface'
+import { CanvasDocContext } from './canvasDocContext'
+import { ENTITY_OPEN_EVENT } from '../lib/entityLinks'
 import './Canvas.css'
 
 export default function CanvasPane({
@@ -58,8 +60,22 @@ export default function CanvasPane({
   }, [doc, docPath, onLoaded])
   const reveal = useReveal(Boolean(doc))
 
+  // A name tag ⌘-clicked on one of its cards opens here, in this pane (lib/entityLinks.js).
+  // Opening beside is left to the tag, which knows the split.
+  const onEntityOpen = useCallback((event) => {
+    if (event.detail?.beside || !event.detail?.path) return
+    event.preventDefault()
+    onOpenDoc?.(event.detail.path)
+  }, [onOpenDoc])
+  const paneRef = useRef(null)
+  useEffect(() => {
+    const pane = paneRef.current
+    pane?.addEventListener(ENTITY_OPEN_EVENT, onEntityOpen)
+    return () => pane?.removeEventListener(ENTITY_OPEN_EVENT, onEntityOpen)
+  }, [onEntityOpen])
+
   return (
-    <div className="canvas-pane">
+    <div ref={paneRef} className="canvas-pane">
       <PaneSurfaceReveal reveal={reveal} loaded={Boolean(doc)} backdrop={<div className="canvas-surface" />} skeleton={<CanvasSkeleton />} label="Opening canvas">
       {doc ? (
         // Note cards reach the app's notes through context, not props: CanvasNode is
@@ -71,6 +87,7 @@ export default function CanvasPane({
           setNotesForDoc={setNotesForDoc}
           openDocs={openDocs}
         >
+          <CanvasDocContext.Provider value={docPath}>
           <CanvasSurface
             key={docPath}
             docLocked={locked}
@@ -83,6 +100,7 @@ export default function CanvasPane({
             setActiveEditor={setActiveEditor}
             isActive={isActive}
           />
+          </CanvasDocContext.Provider>
         </CanvasNotesProvider>
       ) : null}
       {doc ? <DocLockBadge className="is-floating" projectName={projectName} docPath={docPath} /> : null}

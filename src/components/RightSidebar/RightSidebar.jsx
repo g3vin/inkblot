@@ -12,6 +12,7 @@ import InspectorHeader from './InspectorHeader'
 import MapInspectorPanel from './MapInspectorPanel'
 import ReferencesPanel from './references/ReferencesPanel'
 import StatsPanel from '../stats/StatsPanel'
+import DetailsPanel from '../details/DetailsPanel'
 import { OutputPanel, TypesetPanel } from './finishing/FinishingPanels'
 import TypesetHistoryView from './TypesetHistoryView'
 import useSpaceSwipe, { useSwipeProgress } from '../../hooks/useSpaceSwipe'
@@ -256,6 +257,7 @@ export default function RightSidebar({
     if (tabId === 'map') return <MapInspectorPanel />
     if (tabId === 'references') return <ReferencesPanel />
     if (tabId === 'stats') return <StatsPanel />
+    if (tabId === 'details') return <DetailsPanel docPath={activeDoc} />
     if (tabId === 'typeset') return <TypesetPanel onShowOutput={() => handleSelectTab('output')} />
     if (tabId === 'output') return <OutputPanel />
 

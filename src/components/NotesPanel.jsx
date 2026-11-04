@@ -17,6 +17,8 @@ import {
   touchNote,
 } from '../lib/noteUtils'
 import { EmptyState } from '../ui/Surfaces.jsx'
+import { PanelActions, ScopeMenu } from '../ui/PanelActions.jsx'
+import { useCharacterEntries } from '../lib/storyEntries'
 import { NOTE_POP_MS, closeSchedule, drawMs, lineStart, openTiming, prefersReducedMotion } from '../lib/noteReveal'
 import { SPRINGS, pastSlop } from '../ui/physics.js'
 import { springTiming } from '../ui/useSpring.js'
@@ -203,6 +205,10 @@ export default function NotesPanel({
     updateNote(id, (note) => touchNote(note, { audio }))
   }, [updateNote])
 
+  const handleChangeCharacters = useCallback((id, characters) => {
+    updateNote(id, (note) => touchNote(note, { characters }))
+  }, [updateNote])
+
   const handleRemoveImage = useCallback((id, imageId) => {
     updateNote(id, (note) => touchNote(note, {
       images: (note.images || []).filter((image) => image.id !== imageId),
@@ -243,12 +249,24 @@ export default function NotesPanel({
 
   const queryText = query.trim().toLowerCase()
 
+  // Which character's notes to show: offered only for the characters these notes name,
+  // so a document with none shows no menu, and a choice whose notes are gone lapses.
+  const characters = useCharacterEntries()
+  const [characterChoice, setCharacterChoice] = useState('')
+  const characterOptions = useMemo(() => {
+    const named = new Set(notes.flatMap((note) => note.characters || []))
+    const present = characters.filter((entry) => named.has(entry.path))
+    return present.length ? [{ value: '', label: 'All notes' }, ...present.map((entry) => ({ value: entry.path, label: entry.name }))] : []
+  }, [characters, notes])
+  const characterFilter = characterOptions.some((option) => option.value === characterChoice) ? characterChoice : ''
+
   const noteMatchesSearch = useCallback((note) => {
+    if (characterFilter && !(note.characters || []).includes(characterFilter)) return false
     if (!queryText) return true
     const anchor = (note.anchor || '').toLowerCase()
     const content = (note.content || '').toLowerCase()
     return anchor.includes(queryText) || content.includes(queryText)
-  }, [queryText])
+  }, [characterFilter, queryText])
 
   // Build the display tree: sort, group children under parents, and prune
   // branches where neither the note nor any descendant matches the search.
@@ -419,6 +437,7 @@ export default function NotesPanel({
           onChangeColor={(ink) => handleChangeColor(branch.note.id, ink)}
           onStopEditing={clearActiveNoteHighlight}
           onChangeAudio={(audio) => handleChangeAudio(branch.note.id, audio)}
+          onChangeCharacters={(characters) => handleChangeCharacters(branch.note.id, characters)}
           projectName={projectName}
         />
 
@@ -439,6 +458,11 @@ export default function NotesPanel({
 
   return (
     <div className="sidebar-panel notes-panel" data-help="notes.panel">
+      {characterOptions.length ? (
+        <PanelActions>
+          <ScopeMenu label="Show" value={characterFilter} onChange={setCharacterChoice} options={characterOptions} />
+        </PanelActions>
+      ) : null}
       <div ref={listRef} className="notes-list">
         {noteTree.length === 0 ? (
           notes.length === 0

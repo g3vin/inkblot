@@ -37,18 +37,18 @@ const titles = (title) => [...column(title).querySelectorAll('.inspector-editor-
 const click = (el) => act(async () => el.dispatchEvent(new MouseEvent('click', { bubbles: true })))
 
 ok('both layouts are listed', !!column('Write') && !!column('Typeset'))
-ok('Write lists its panels first, then the rest', titles('Write').join() === 'Clipboard,Workbench,Notes,Timeline,References,History,Stats,Typeset,Print & export')
+ok('Write lists its panels first, then the rest', titles('Write').join() === 'Clipboard,Workbench,Notes,Timeline,References,History,Stats,Details,Typeset,Print & export')
 ok('shown panels are checked', box('Write', 'Notes').checked && !box('Write', 'Typeset').checked)
 
 await click(box('Write', 'Clipboard'))
 ok('unchecking hides the panel', !L.tabsOf(readInspectorLayouts(), 'drafting').includes('clipboard'))
-ok('and it moves under the shown ones', titles('Write').indexOf('Clipboard') > titles('Write').indexOf('Stats'))
-ok('Typeset is untouched', L.tabsOf(readInspectorLayouts(), 'finishing').join() === 'typeset,output,notes,references,history,stats')
+ok('and it moves under the shown ones', titles('Write').indexOf('Clipboard') > titles('Write').indexOf('Details'))
+ok('Typeset is untouched', L.tabsOf(readInspectorLayouts(), 'finishing').join() === 'typeset,output,notes,references,history,stats,details')
 
 await click(box('Write', 'Print & export'))
 ok('checking shows it, last', L.tabsOf(readInspectorLayouts(), 'drafting').at(-1) === 'output')
 
-for (const tab of ['Workbench', 'Notes', 'Timeline', 'References', 'History', 'Stats']) await click(box('Write', tab))
+for (const tab of ['Workbench', 'Notes', 'Timeline', 'References', 'History', 'Stats', 'Details']) await click(box('Write', tab))
 ok('down to one panel', L.tabsOf(readInspectorLayouts(), 'drafting').join() === 'output')
 ok('whose box cannot be unchecked', box('Write', 'Print & export').disabled)
 ok('and it is saved', JSON.parse(prefs.getPreference(L.INSPECTOR_LAYOUTS_KEY)).layouts.drafting.join() === 'output')

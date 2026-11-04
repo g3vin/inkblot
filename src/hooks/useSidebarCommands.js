@@ -24,6 +24,12 @@ import {
 } from '../lib/versionActions'
 import { editorForTile, replaceTileWord, selectTileWord } from '../lib/workbenchActions'
 import { isEditorReady } from '../lib/editorUtils'
+import { NOTE_CHARACTERS_MOVED_EVENT, remapNoteCharacters } from '../lib/noteCharacterLinks'
+
+const listenWindow = (type, listener) => {
+  window.addEventListener(type, listener)
+  return () => window.removeEventListener(type, listener)
+}
 
 export function useSidebarCommands({
   projectName,
@@ -85,6 +91,17 @@ export function useSidebarCommands({
           }
           return Object.keys(changes).length ? touchNote(viewed, changes) : viewed
         }))
+      }),
+
+      // A character renamed or moved: every note held here that names it follows. Not an
+      // edit of the note, so no timestamp (noteCharacterLinks.js does the closed documents).
+      listenWindow(NOTE_CHARACTERS_MOVED_EVENT, ({ detail }) => {
+        const { projectName: project, notesByDoc: held = {}, setNotesForDoc: setFor } = state()
+        if (!detail || detail.projectName !== project) return
+        for (const [docPath, notes] of Object.entries(held)) {
+          if (remapNoteCharacters(notes, detail.entryPath, detail.nextPath, detail.type) === notes) continue
+          setFor?.(docPath, (current) => remapNoteCharacters(current, detail.entryPath, detail.nextPath, detail.type))
+        }
       }),
 
       documentSurface.onCommand('removeNote', ({ docPath, noteId }) => {
